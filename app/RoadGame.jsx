@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { fetchTeamSchedule } from "./ticketmaster";
+import { findCity, geocodeCity, reverseGeocode } from "./cities";
 
 // ─── BRAND PALETTE (matched to logo) ──────────────────────────────────────────
 const BRAND = {
@@ -428,13 +430,22 @@ function LogoMark({ size = 32 }) {
 
 // ─── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function RoadGame() {
-  const userLat = 35.4443, userLng = -82.5098, userCity = "Fletcher, NC";
 
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("signin");
   const [authEmail, setAuthEmail] = useState("");
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState(null);
+  const [authCity, setAuthCity] = useState("");
+  const [authCoords, setAuthCoords] = useState(null);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [newCity, setNewCity] = useState("");
+  const [newCoords, setNewCoords] = useState(null);
+  // Location is per-user. Default to Fletcher, NC only as a fallback if profile has none.
+  const userLat = user?.lat ?? 35.4443;
+  const userLng = user?.lng ?? -82.5098;
+  const userCity = user?.city ?? "Fletcher, NC";
   const [loading, setLoading] = useState(true);
 
   const [view, setView] = useState("alerts");
@@ -485,11 +496,29 @@ export default function RoadGame() {
     const email = authEmail.trim().toLowerCase();
     if (!email || !email.includes("@") || !email.includes(".")) { setAuthError("Enter a valid email address"); return; }
     if (authMode === "signup" && !authName.trim()) { setAuthError("Enter your name"); return; }
+    if (authMode === "signup" && !authCity.trim()) { setAuthError("Enter your city or use 'Detect my location'"); return; }
+
     try {
       if (authMode === "signup") {
         const existing = await storage.get(`user:${email}`);
         if (existing) { setAuthError("Account already exists — sign in instead"); return; }
-        const newUser = { email, name: authName.trim(), createdAt: new Date().toISOString() };
+
+        // Resolve city name to coordinates
+        let location = null;
+        if (authCoords) {
+          location = { lat: authCoords.lat, lng: authCoords.lng, city: authCity.trim() };
+        } else {
+          const geo = await geocodeCity(authCity.trim());
+          if (!geo) { setAuthError(`Couldn't find "${authCity}". Try a major city nearby.`); return; }
+          location = { lat: geo.lat, lng: geo.lng, city: geo.name };
+        }
+
+        const newUser = {
+          email,
+          name: authName.trim(),
+          createdAt: new Date().toISOString(),
+          ...location,
+        };
         const profile = { ...newUser, following: [], alertsEnabled: true, alertRadius: 350 };
         const saved = await storage.set(`user:${email}`, JSON.stringify(profile));
         if (!saved) { setAuthError("Couldn't save account — storage unavailable"); return; }
@@ -500,7 +529,13 @@ export default function RoadGame() {
         const existing = await storage.get(`user:${email}`);
         if (!existing) { setAuthError("No account found — sign up first"); return; }
         const p = JSON.parse(existing);
-        const session = { email: p.email || email, name: p.name || "Fan" };
+        const session = {
+          email: p.email || email,
+          name: p.name || "Fan",
+          lat: p.lat,
+          lng: p.lng,
+          city: p.city,
+        };
         await storage.set("session", JSON.stringify(session));
         setUser(session);
         setFollowing(p.following || []);
@@ -508,10 +543,79 @@ export default function RoadGame() {
         setAlertRadius(p.alertRadius ?? 350);
         showToast(`Welcome back, ${session.name.split(" ")[0]}!`);
       }
-      setAuthEmail(""); setAuthName("");
+      setAuthEmail(""); setAuthName(""); setAuthCity(""); setAuthCoords(null);
     } catch (e) {
       setAuthError(`Error: ${e.message || "Something went wrong"}`);
     }
+  }
+async function saveNewLocation() {
+    if (!newCity.trim()) { showToast("Enter a city first"); return; }
+
+    let location = null;
+    if (newCoords) {
+      location = { lat: newCoords.lat, lng: newCoords.lng, city: newCity.trim() };
+    } else {
+      const geo = await geocodeCity(newCity.trim());
+      if (!geo) { showToast(`Couldn't find "${newCity}". Try a major city nearby.`); return; }
+      location = { lat: geo.lat, lng: geo.lng, city: geo.name };
+    }
+
+    const updatedUser = { ...user, ...location };
+    setUser(updatedUser);
+    await storage.set("session", JSON.stringify(updatedUser));
+
+    // Also update the stored profile so future logins remember
+    const profileRaw = await storage.get(`user:${user.email}`);
+    if (profileRaw) {
+      const profile = JSON.parse(profileRaw);
+      await storage.set(`user:${user.email}`, JSON.stringify({ ...profile, ...location }));
+    }
+
+    setEditingLocation(false);
+    setNewCity("");
+    setNewCoords(null);
+    showToast(`Location updated to ${location.city}`);
+  }
+
+  async function detectNewLocation() {
+    if (!navigator.geolocation) {
+      showToast("Your browser doesn't support location detection.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const cityName = await reverseGeocode(latitude, longitude);
+        setNewCity(cityName || "My Location");
+        setNewCoords({ lat: latitude, lng: longitude });
+      },
+      () => {
+        showToast("Location permission denied. Type your city instead.");
+      },
+      { timeout: 10000 }
+    );
+  }
+  async function detectLocation() {
+    setAuthError(null);
+    if (!navigator.geolocation) {
+      setAuthError("Your browser doesn't support location detection. Type your city instead.");
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const cityName = await reverseGeocode(latitude, longitude);
+        setAuthCity(cityName || "My Location");
+        setAuthCoords({ lat: latitude, lng: longitude });
+        setDetectingLocation(false);
+      },
+      (err) => {
+        setDetectingLocation(false);
+        setAuthError("Location permission denied. Type your city instead.");
+      },
+      { timeout: 10000 }
+    );
   }
 
   async function signOut() {
@@ -525,19 +629,41 @@ export default function RoadGame() {
     else { setFollowing([...following, { team, league }]); showToast(`Following ${team}`); }
   }
   function isFollowing(team, league) { return !!following.find(f => f.team === team && f.league === league); }
-  function openSchedule(team, league) { setActiveTeam({ team, league }); setView("schedule"); setExpanded(null); }
+  function openSchedule(team, league) { setActiveTeam({ team, league }); setExpanded(null); }
 
   const teamsInLeague = useMemo(() => {
     const list = TEAMS_BY_LEAGUE[activeLeague] || [];
     return list.filter(t => t.toLowerCase().includes(search.toLowerCase()));
   }, [activeLeague, search]);
 
-  const schedule = useMemo(() => {
-    if (!activeTeam) return [];
-    return generateSchedule(activeTeam.team, activeTeam.league).map(g => ({
-      ...g, dist: haversine(userLat, userLng, g.lat, g.lng),
-      ticketsFrom: Math.round(40 + Math.random() * 80),
-    }));
+const [schedule, setSchedule] = useState([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSchedule() {
+      if (!activeTeam) { setSchedule([]); return; }
+      setScheduleLoading(true);
+
+      const realGames = await fetchTeamSchedule(activeTeam.team, activeTeam.league);
+
+      if (cancelled) return;
+
+      if (realGames && realGames.length > 0) {
+        const enriched = realGames.map(g => ({
+          ...g,
+          dist: haversine(userLat, userLng, g.lat, g.lng),
+          ticketsFrom: g.ticketsFrom || null,
+        }));
+        setSchedule(enriched);
+      } else {
+        // No real games available — show empty state instead of demo data
+        setSchedule([]);
+      }
+      setScheduleLoading(false);
+    }
+    loadSchedule();
+    return () => { cancelled = true; };
   }, [activeTeam, userLat, userLng]);
 
   const visibleSchedule = useMemo(() => nearbyOnly ? schedule.filter(g => g.dist <= maxDist) : schedule, [schedule, nearbyOnly, maxDist]);
@@ -625,7 +751,33 @@ export default function RoadGame() {
                   }} />
               </div>
             )}
-
+{authMode === "signup" && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>
+                  Your City
+                </label>
+                <input type="text" value={authCity}
+                  onChange={e => { setAuthCity(e.target.value); setAuthCoords(null); }}
+                  placeholder="Charlotte, NC"
+                  style={{
+                    width: "100%", padding: "11px 13px", borderRadius: 8,
+                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                    color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
+                    fontFamily: "'Inter', sans-serif",
+                    marginBottom: 6,
+                  }} />
+                <button type="button" onClick={detectLocation} disabled={detectingLocation}
+                  className="oswald"
+                  style={{
+                    background: "transparent", color: BRAND.greenDark,
+                    border: `1px solid ${BRAND.greenDark}`, borderRadius: 7,
+                    padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    cursor: "pointer", width: "100%",
+                  }}>
+                  {detectingLocation ? "DETECTING..." : "📍 USE MY CURRENT LOCATION"}
+                </button>
+              </div>
+            )}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
               <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com"
@@ -769,7 +921,67 @@ export default function RoadGame() {
               <div style={{ fontSize: 12, color: BRAND.muted, fontWeight: 500 }}>{user.email}</div>
             </div>
           </div>
-
+<SectionCard title="YOUR LOCATION" icon="📍">
+            {!editingLocation ? (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.cream }}>{userCity}</div>
+                  <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 2, fontWeight: 500 }}>
+                    All distances calculated from here
+                  </div>
+                </div>
+                <button onClick={() => { setEditingLocation(true); setNewCity(""); setNewCoords(null); }}
+                  className="oswald" style={{
+                    background: "transparent",
+                    border: `1.5px solid ${BRAND.green}`,
+                    color: BRAND.green,
+                    borderRadius: 7, padding: "6px 12px",
+                    fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+                  }}>CHANGE</button>
+              </div>
+            ) : (
+              <div>
+                <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>
+                  New City
+                </label>
+                <input type="text" value={newCity}
+                  onChange={e => { setNewCity(e.target.value); setNewCoords(null); }}
+                  placeholder="Charlotte, NC"
+                  onKeyDown={e => e.key === "Enter" && saveNewLocation()}
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: 8,
+                    background: BRAND.slateDark,
+                    border: `1.5px solid rgba(245,239,226,0.1)`,
+                    color: BRAND.cream, fontSize: 14, outline: "none", fontWeight: 500,
+                    fontFamily: "'Inter', sans-serif", marginBottom: 8, boxSizing: "border-box",
+                  }} />
+                <button type="button" onClick={detectNewLocation} className="oswald" style={{
+                  background: "transparent", color: BRAND.muted,
+                  border: `1px solid ${BRAND.muted}`, borderRadius: 7,
+                  padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                  cursor: "pointer", width: "100%", marginBottom: 10,
+                }}>
+                  📍 USE MY CURRENT LOCATION
+                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { setEditingLocation(false); setNewCity(""); setNewCoords(null); }}
+                    className="oswald" style={{
+                      flex: 1, background: "transparent",
+                      border: `1.5px solid ${BRAND.muted}`,
+                      color: BRAND.muted,
+                      borderRadius: 7, padding: "8px",
+                      fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+                    }}>CANCEL</button>
+                  <button onClick={saveNewLocation} className="oswald" style={{
+                    flex: 1, background: BRAND.green, color: BRAND.charcoal,
+                    border: "none", borderRadius: 7, padding: "8px",
+                    fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+                    boxShadow: `0 3px 0 ${BRAND.greenDark}`,
+                  }}>SAVE</button>
+                </div>
+              </div>
+            )}
+          </SectionCard>
           <SectionCard title="ALERT SETTINGS" icon="●">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
@@ -1010,7 +1222,7 @@ export default function RoadGame() {
           <div style={{ display: "flex", gap: 7, marginBottom: 12 }}>
             <Stat value={schedule.length} label="GAMES" />
             <Stat value={reachableCount} label={`WITHIN ${maxDist}MI`} accent={BRAND.green} />
-            <Stat value={`${Math.min(...schedule.map(g => g.dist))}MI`} label="NEAREST" accent={BRAND.amber} />
+            <Stat value={schedule.length > 0 ? `${Math.min(...schedule.map(g => g.dist))}MI` : "—"} label="NEAREST" accent={BRAND.amber} />
           </div>
 
           <div style={{
@@ -1032,7 +1244,48 @@ export default function RoadGame() {
             </div>
             <input type="range" min={50} max={2500} step={50} value={maxDist} onChange={e => setMaxDist(Number(e.target.value))} style={{ width: "100%" }} />
           </div>
+{scheduleLoading && (
+            <div style={{
+              background: BRAND.slateLight,
+              border: `1.5px solid rgba(124,194,66,0.2)`,
+              borderRadius: 12,
+              padding: "30px 20px",
+              textAlign: "center",
+            }}>
+              <div className="oswald" style={{
+                fontSize: 12, color: BRAND.muted, letterSpacing: 2, fontWeight: 700,
+              }}>LOADING REAL SCHEDULE...</div>
+            </div>
+          )}
 
+          {!scheduleLoading && schedule.length === 0 && (
+            <div style={{
+              background: BRAND.slateLight,
+              border: `2px dashed ${BRAND.green}`,
+              borderRadius: 12,
+              padding: "32px 20px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🏟️</div>
+              <div className="oswald" style={{
+                fontSize: 18, color: BRAND.cream, letterSpacing: 0.5,
+                fontWeight: 700, marginBottom: 6,
+              }}>COME BACK NEXT SEASON!</div>
+              <div style={{
+                fontSize: 13, color: BRAND.muted, fontWeight: 500, lineHeight: 1.5,
+                maxWidth: 280, margin: "0 auto",
+              }}>
+                {activeTeam.team} doesn't have any upcoming games right now.
+                Check back when their next season kicks off.
+              </div>
+              <div className="oswald" style={{
+                marginTop: 14, fontSize: 10, color: BRAND.green,
+                letterSpacing: 1.5, fontWeight: 700,
+              }}>
+                {leagueMeta.emoji} {leagueMeta.name} · {leagueMeta.season}
+              </div>
+            </div>
+          )}
           {visibleSchedule.map(game => {
             const tier = travelTier(game.dist);
             const isExpanded = expanded === game.id;
