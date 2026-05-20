@@ -634,7 +634,7 @@ async function saveNewLocation() {
     else { setFollowing([...following, { team, league }]); showToast(`Following ${team}`); }
   }
   function isFollowing(team, league) { return !!following.find(f => f.team === team && f.league === league); }
-  function openSchedule(team, league) { setActiveTeam({ team, league }); setExpanded(null); }
+  function openSchedule(team, league, gameId = null) { setActiveTeam({ team, league }); setExpanded(gameId); setTravelTab("tickets"); }
 
   const teamsInLeague = useMemo(() => {
     const list = TEAMS_BY_LEAGUE[activeLeague] || [];
@@ -1082,13 +1082,13 @@ const [schedule, setSchedule] = useState([]);
               {weekAlerts.length > 0 && (
                 <div style={{ marginBottom: 18 }}>
                   <SectionHeader>● THIS WEEK</SectionHeader>
-                  {weekAlerts.map((a, i) => <AlertCard key={i} alert={a} onTap={() => openSchedule(a.team, a.league)} urgent />)}
+                  {weekAlerts.map((a, i) => <AlertCard key={i} alert={a} onTap={() => openSchedule(a.team, a.league, a.id)} urgent />)}
                 </div>
               )}
               {alerts.filter(a => !a.isWeek).length > 0 && (
                 <div>
                   <SectionHeader>COMING UP · NEXT 30 DAYS</SectionHeader>
-                  {alerts.filter(a => !a.isWeek).map((a, i) => <AlertCard key={i} alert={a} onTap={() => openSchedule(a.team, a.league)} />)}
+                  {alerts.filter(a => !a.isWeek).map((a, i) => <AlertCard key={i} alert={a} onTap={() => openSchedule(a.team, a.league, a.id)} />)}
                 </div>
               )}
               {alerts.length === 0 && (
