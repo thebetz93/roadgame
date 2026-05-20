@@ -393,19 +393,24 @@ const TRAVEL = {
   train: { icon: "🚆", label: "Train", color: BRAND.amber },
 };
 
-function computeAlerts(following, alertRadius, userLat, userLng) {
+async function computeAlerts(following, alertRadius, userLat, userLng) {
   const now = new Date();
   const weekOut = new Date(now.getTime() + 7 * 86400000);
   const monthOut = new Date(now.getTime() + 30 * 86400000);
+
+  // Fetch real schedules for all followed teams in parallel
+  const schedules = await Promise.all(
+    following.map(f => fetchTeamSchedule(f.team, f.league).then(games => ({ team: f.team, league: f.league, games: games || [] })))
+  );
+
   const all = [];
-  following.forEach(f => {
-    const sched = generateSchedule(f.team, f.league);
-    sched.forEach(g => {
+  schedules.forEach(({ team, league, games }) => {
+    games.forEach(g => {
       const gameDate = new Date(g.dateISO);
       if (gameDate < now) return;
       const dist = haversine(userLat, userLng, g.lat, g.lng);
       if (dist <= alertRadius && gameDate <= monthOut) {
-        all.push({ ...g, dist, team: f.team, league: f.league, isWeek: gameDate <= weekOut });
+        all.push({ ...g, dist, team, league, isWeek: gameDate <= weekOut });
       }
     });
   });
@@ -670,9 +675,16 @@ const [schedule, setSchedule] = useState([]);
   const reachableCount = schedule.filter(g => g.dist <= maxDist).length;
   const leagueMeta = LEAGUES.find(l => l.id === (activeTeam?.league || activeLeague));
 
-  const alerts = useMemo(() => {
-    if (!alertsEnabled || following.length === 0) return [];
-    return computeAlerts(following, alertRadius, userLat, userLng);
+  const [alerts, setAlerts] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAlerts() {
+      if (!alertsEnabled || following.length === 0) { setAlerts([]); return; }
+      const result = await computeAlerts(following, alertRadius, userLat, userLng);
+      if (!cancelled) setAlerts(result);
+    }
+    loadAlerts();
+    return () => { cancelled = true; };
   }, [following, alertRadius, alertsEnabled, userLat, userLng]);
   const weekAlerts = alerts.filter(a => a.isWeek);
 
