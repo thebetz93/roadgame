@@ -544,18 +544,24 @@ async function saveNewLocation() {
 
 const [schedule, setSchedule] = useState([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState(false); // true = API failed, false = loaded ok
 
   useEffect(() => {
     let cancelled = false;
     async function loadSchedule() {
-      if (!activeTeam) { setSchedule([]); return; }
+      if (!activeTeam) { setSchedule([]); setScheduleError(false); return; }
       setScheduleLoading(true);
+      setScheduleError(false);
 
       const realGames = await fetchTeamSchedule(activeTeam.team, activeTeam.league);
 
       if (cancelled) return;
 
-      if (realGames && realGames.length > 0) {
+      if (realGames === null) {
+        // API failure or key not configured — don't claim the season is over
+        setSchedule([]);
+        setScheduleError(true);
+      } else if (realGames.length > 0) {
         const enriched = realGames.map(g => ({
           ...g,
           dist: haversine(userLat, userLng, g.lat, g.lng),
@@ -563,7 +569,7 @@ const [schedule, setSchedule] = useState([]);
         }));
         setSchedule(enriched);
       } else {
-        // No real games available — show empty state instead of demo data
+        // API responded successfully but genuinely no upcoming games
         setSchedule([]);
       }
       setScheduleLoading(false);
@@ -1249,7 +1255,29 @@ const [schedule, setSchedule] = useState([]);
             </div>
           )}
 
-          {!scheduleLoading && schedule.length === 0 && (
+          {!scheduleLoading && schedule.length === 0 && scheduleError && (
+            <div style={{
+              background: BRAND.slateLight,
+              border: `1.5px solid rgba(245,239,226,0.1)`,
+              borderRadius: 12,
+              padding: "32px 20px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📡</div>
+              <div className="oswald" style={{
+                fontSize: 16, color: BRAND.cream, letterSpacing: 0.5,
+                fontWeight: 700, marginBottom: 6,
+              }}>SCHEDULE UNAVAILABLE</div>
+              <div style={{
+                fontSize: 13, color: BRAND.muted, fontWeight: 500, lineHeight: 1.5,
+                maxWidth: 280, margin: "0 auto",
+              }}>
+                Couldn't load the schedule right now. Check back in a moment.
+              </div>
+            </div>
+          )}
+
+          {!scheduleLoading && schedule.length === 0 && !scheduleError && (
             <div style={{
               background: BRAND.slateLight,
               border: `2px dashed ${BRAND.green}`,
@@ -1266,8 +1294,8 @@ const [schedule, setSchedule] = useState([]);
                 fontSize: 13, color: BRAND.muted, fontWeight: 500, lineHeight: 1.5,
                 maxWidth: 280, margin: "0 auto",
               }}>
-                {activeTeam.team} doesn't have any upcoming games right now.
-                Check back when their next season kicks off.
+                {activeTeam.team} doesn't have any upcoming games posted yet.
+                Check back when their next season schedule drops.
               </div>
               <div className="oswald" style={{
                 marginTop: 14, fontSize: 10, color: BRAND.green,
