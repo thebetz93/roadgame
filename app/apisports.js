@@ -5,11 +5,22 @@ const KEY = process.env.NEXT_PUBLIC_APISPORTS_KEY;
 // Session-scoped cache: avoids repeat team-ID lookups on the same page
 const idCache = {};
 
+// Calculate current season dynamically so this never goes stale
+function currentSeason(leagueStartMonth) {
+  const now = new Date();
+  const m = now.getMonth(); // 0 = Jan
+  return m >= leagueStartMonth ? now.getFullYear() : now.getFullYear() - 1;
+}
+
 const CFG = {
-  nfl: { base: 'https://v1.american-football.api-sports.io', league: 1,   season: 2025 },
-  nba: { base: 'https://v2.nba.api-sports.io',               league: null, season: 2025 },
-  mlb: { base: 'https://v1.baseball.api-sports.io',          league: 1,   season: 2026 },
-  nhl: { base: 'https://v1.hockey.api-sports.io',            league: 57,  season: 2025 },
+  // NFL starts September (month 8) — season labeled by year it starts
+  nfl: { base: 'https://v1.american-football.api-sports.io', league: 1,   get season() { return currentSeason(8); } },
+  // NBA starts October (month 9)
+  nba: { base: 'https://v2.nba.api-sports.io',               league: null, get season() { return currentSeason(9); } },
+  // MLB is calendar year (starts March, month 2)
+  mlb: { base: 'https://v1.baseball.api-sports.io',          league: 1,   get season() { return new Date().getFullYear(); } },
+  // NHL starts October (month 9)
+  nhl: { base: 'https://v1.hockey.api-sports.io',            league: 57,  get season() { return currentSeason(9); } },
 };
 
 // API-Sports occasionally uses different names than our VENUES keys
@@ -171,11 +182,14 @@ const PARSERS = { nfl: parseNFL, nba: parseNBA, mlb: parseMLB, nhl: parseNHL };
 
 export async function fetchTeamSchedule(teamName, league) {
   if (!KEY) {
-    console.warn('NEXT_PUBLIC_APISPORTS_KEY not configured');
+    console.warn('NEXT_PUBLIC_APISPORTS_KEY not configured — add it to .env.local');
     return null;
   }
   try {
+    const cfg = CFG[league];
+    console.log(`[API-Sports] ${teamName} (${league}) season=${cfg?.season}`);
     const teamId = await getTeamId(teamName, league);
+    console.log(`[API-Sports] teamId=${teamId}`);
     if (teamId == null) return null;
 
     const raw = await getGames(teamId, league);
