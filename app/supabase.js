@@ -4,7 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 // Replace these with your real values in .env.local (or Vercel env settings).
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
+  { auth: { flowType: 'implicit' } }
 );
 
 export { supabase };
