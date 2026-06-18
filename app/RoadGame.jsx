@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./ticketmaster";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
+import { sendMagicLink, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
 
 // ─── BRAND PALETTE (matched to logo) ──────────────────────────────────────────
 const BRAND = {
@@ -452,6 +453,8 @@ export default function RoadGame() {
   const userLng = user?.lng ?? -82.5098;
   const userCity = user?.city ?? "Fletcher, NC";
   const [loading, setLoading] = useState(true);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [pendingProfile, setPendingProfile] = useState(null);
 
   const [view, setView] = useState("alerts");
   const [activeLeague, setActiveLeague] = useState("nfl");
@@ -468,30 +471,62 @@ export default function RoadGame() {
   const [alertRadius, setAlertRadius] = useState(350);
 
   useEffect(() => {
-    async function loadSession() {
+    async function loadAuthedUser() {
       try {
-        const sessionRaw = await storage.get("session");
-        if (sessionRaw) {
-          const data = JSON.parse(sessionRaw);
-          setUser(data);
-          const profileRaw = await storage.get(`user:${data.email}`);
-          if (profileRaw) {
-            const p = JSON.parse(profileRaw);
-            setFollowing(p.following || []);
-            setAlertsEnabled(p.alertsEnabled ?? true);
-            setAlertRadius(p.alertRadius ?? 350);
+        const supaUser = await getCurrentUser();
+        if (supaUser) {
+          const profile = await getMyProfile(supaUser.id);
+          if (profile && profile.name && profile.city) {
+            setUser({ id: supaUser.id, email: supaUser.email, name: profile.name, city: profile.city, lat: profile.lat, lng: profile.lng });
+            setFollowing(profile.following || []);
+            setAlertsEnabled(profile.alerts_enabled ?? true);
+            setAlertRadius(profile.alert_radius ?? 350);
+          } else {
+            setPendingProfile({ id: supaUser.id, email: supaUser.email });
           }
         }
       } catch (e) {}
       setLoading(false);
     }
-    loadSession();
+    loadAuthedUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const supaUser = session.user;
+        const profile = await getMyProfile(supaUser.id);
+        if (profile && profile.name && profile.city) {
+          setUser({ id: supaUser.id, email: supaUser.email, name: profile.name, city: profile.city, lat: profile.lat, lng: profile.lng });
+          setFollowing(profile.following || []);
+          setAlertsEnabled(profile.alerts_enabled ?? true);
+          setAlertRadius(profile.alert_radius ?? 350);
+          setPendingProfile(null);
+        } else {
+          setPendingProfile({ id: supaUser.id, email: supaUser.email });
+        }
+        setLoading(false);
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setFollowing([]);
+        setPendingProfile(null);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    const profile = { ...user, following, alertsEnabled, alertRadius };
-    storage.set(`user:${user.email}`, JSON.stringify(profile)).catch(() => {});
+    upsertMyProfile({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      city: user.city,
+      lat: user.lat,
+      lng: user.lng,
+      following,
+      alerts_enabled: alertsEnabled,
+      alert_radius: alertRadius,
+    }).catch(() => {});
   }, [following, alertsEnabled, alertRadius, user]);
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2500); }
@@ -500,57 +535,11 @@ export default function RoadGame() {
     setAuthError(null);
     const email = authEmail.trim().toLowerCase();
     if (!email || !email.includes("@") || !email.includes(".")) { setAuthError("Enter a valid email address"); return; }
-    if (authMode === "signup" && !authName.trim()) { setAuthError("Enter your name"); return; }
-    if (authMode === "signup" && !authCity.trim()) { setAuthError("Enter your city or use 'Detect my location'"); return; }
-
     try {
-      if (authMode === "signup") {
-        const existing = await storage.get(`user:${email}`);
-        if (existing) { setAuthError("Account already exists — sign in instead"); return; }
-
-        // Resolve city name to coordinates
-        let location = null;
-        if (authCoords) {
-          location = { lat: authCoords.lat, lng: authCoords.lng, city: authCity.trim() };
-        } else {
-          const geo = await geocodeCity(authCity.trim());
-          if (!geo) { setAuthError(`Couldn't find "${authCity}". Try a major city nearby.`); return; }
-          location = { lat: geo.lat, lng: geo.lng, city: geo.name };
-        }
-
-        const newUser = {
-          email,
-          name: authName.trim(),
-          createdAt: new Date().toISOString(),
-          ...location,
-        };
-        const profile = { ...newUser, following: [], alertsEnabled: true, alertRadius: 350 };
-        const saved = await storage.set(`user:${email}`, JSON.stringify(profile));
-        if (!saved) { setAuthError("Couldn't save account — storage unavailable"); return; }
-        await storage.set("session", JSON.stringify(newUser));
-        setUser(newUser);
-        showToast(`Welcome to RoadGame, ${authName.trim().split(" ")[0]}!`);
-      } else {
-        const existing = await storage.get(`user:${email}`);
-        if (!existing) { setAuthError("No account found — sign up first"); return; }
-        const p = JSON.parse(existing);
-        const session = {
-          email: p.email || email,
-          name: p.name || "Fan",
-          lat: p.lat,
-          lng: p.lng,
-          city: p.city,
-        };
-        await storage.set("session", JSON.stringify(session));
-        setUser(session);
-        setFollowing(p.following || []);
-        setAlertsEnabled(p.alertsEnabled ?? true);
-        setAlertRadius(p.alertRadius ?? 350);
-        showToast(`Welcome back, ${session.name.split(" ")[0]}!`);
-      }
-      setAuthEmail(""); setAuthName(""); setAuthCity(""); setAuthCoords(null);
+      await sendMagicLink(email);
+      setMagicLinkSent(true);
     } catch (e) {
-      setAuthError(`Error: ${e.message || "Something went wrong"}`);
+      setAuthError(`Couldn't send magic link: ${e.message || "Please try again"}`);
     }
   }
 async function saveNewLocation() {
@@ -567,14 +556,15 @@ async function saveNewLocation() {
 
     const updatedUser = { ...user, ...location };
     setUser(updatedUser);
-    await storage.set("session", JSON.stringify(updatedUser));
-
-    // Also update the stored profile so future logins remember
-    const profileRaw = await storage.get(`user:${user.email}`);
-    if (profileRaw) {
-      const profile = JSON.parse(profileRaw);
-      await storage.set(`user:${user.email}`, JSON.stringify({ ...profile, ...location }));
-    }
+    await upsertMyProfile({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      ...location,
+      following,
+      alerts_enabled: alertsEnabled,
+      alert_radius: alertRadius,
+    }).catch(() => {});
 
     setEditingLocation(false);
     setNewCity("");
@@ -623,8 +613,44 @@ async function saveNewLocation() {
     );
   }
 
+  async function completeProfile() {
+    setAuthError(null);
+    if (!authName.trim()) { setAuthError("Enter your name"); return; }
+    if (!authCity.trim() && !authCoords) { setAuthError("Enter your city or use 'Detect my location'"); return; }
+
+    let location = null;
+    if (authCoords) {
+      location = { lat: authCoords.lat, lng: authCoords.lng, city: authCity.trim() };
+    } else {
+      const geo = await geocodeCity(authCity.trim());
+      if (!geo) { setAuthError(`Couldn't find "${authCity}". Try a major city nearby.`); return; }
+      location = { lat: geo.lat, lng: geo.lng, city: geo.name };
+    }
+
+    try {
+      await upsertMyProfile({
+        id: pendingProfile.id,
+        email: pendingProfile.email,
+        name: authName.trim(),
+        ...location,
+        following: [],
+        alerts_enabled: true,
+        alert_radius: 350,
+      });
+      setUser({ id: pendingProfile.id, email: pendingProfile.email, name: authName.trim(), ...location });
+      setFollowing([]);
+      setAlertsEnabled(true);
+      setAlertRadius(350);
+      setPendingProfile(null);
+      setAuthName(""); setAuthCity(""); setAuthCoords(null);
+      showToast(`Welcome to RoadGame, ${authName.trim().split(" ")[0]}!`);
+    } catch (e) {
+      setAuthError(`Error saving profile: ${e.message || "Please try again"}`);
+    }
+  }
+
   async function signOut() {
-    await storage.delete("session");
+    await signOutSupabase();
     setUser(null); setFollowing([]); setActiveTeam(null); setView("alerts");
   }
 
@@ -739,67 +765,153 @@ const [schedule, setSchedule] = useState([]);
             color: BRAND.charcoal,
             boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
           }}>
-            <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(45,58,66,0.08)", borderRadius: 8, padding: 3 }}>
-              {[["signin","SIGN IN"],["signup","SIGN UP"]].map(([m, lbl]) => (
-                <button key={m} onClick={() => { setAuthMode(m); setAuthError(null); }} style={{
-                  flex: 1, padding: "9px", borderRadius: 6, border: "none", cursor: "pointer",
-                  background: authMode === m ? BRAND.slate : "transparent",
-                  color: authMode === m ? BRAND.cream : BRAND.muted,
-                  fontSize: 11, fontWeight: 700, letterSpacing: 1,
+            {!magicLinkSent ? (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
+                  <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com"
+                    onKeyDown={e => e.key === "Enter" && handleAuth()}
+                    style={{
+                      width: "100%", padding: "11px 13px", borderRadius: 8,
+                      background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                      color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
+                      fontFamily: "'Inter', sans-serif",
+                    }} />
+                </div>
+
+                {authError && (
+                  <div style={{
+                    background: "rgba(232,69,69,0.08)", border: `1.5px solid ${BRAND.red}`,
+                    color: BRAND.red, borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 12, fontWeight: 600,
+                  }}>{authError}</div>
+                )}
+
+                <button onClick={handleAuth} style={{
+                  width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: BRAND.green, color: BRAND.charcoal,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
                   fontFamily: "'Oswald', sans-serif",
-                }}>{lbl}</button>
+                  boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+                  transition: "transform 0.1s, box-shadow 0.1s",
+                }}
+                onMouseDown={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 2px 0 ${BRAND.greenDark}`; }}
+                onMouseUp={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 0 ${BRAND.greenDark}`; }}
+                >SEND MAGIC LINK →</button>
+              </>
+            ) : (
+              <div style={{ textAlign: "center", padding: "8px 0" }}>
+                <div style={{ fontSize: 48, marginBottom: 14 }}>📬</div>
+                <div className="oswald" style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1, color: BRAND.charcoal, marginBottom: 8 }}>
+                  CHECK YOUR EMAIL
+                </div>
+                <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 4, lineHeight: 1.5, fontWeight: 500 }}>
+                  Magic link sent to:
+                </div>
+                <div style={{ fontSize: 13, color: BRAND.charcoal, fontWeight: 700, marginBottom: 20 }}>{authEmail}</div>
+                <button onClick={() => { setMagicLinkSent(false); setAuthEmail(""); setAuthError(null); }} style={{
+                  background: "transparent", border: `1.5px solid rgba(45,58,66,0.3)`,
+                  color: BRAND.charcoal, borderRadius: 7, padding: "8px 16px",
+                  fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+                  fontFamily: "'Oswald', sans-serif",
+                }}>USE A DIFFERENT EMAIL</button>
+              </div>
+            )}
+
+            {/* Ticket barcode strip */}
+            <div style={{ marginTop: 18, display: "flex", justifyContent: "center", gap: 1.5, opacity: 0.4 }}>
+              {[3,1,2,4,1,3,2,1,4,2,3,1,2,1,3,4,1,2,3,1,4,2,1,3].map((w, i) => (
+                <div key={i} style={{ width: w, height: 24, background: BRAND.charcoal }} />
               ))}
             </div>
+            <div style={{ fontSize: 10, color: BRAND.muted, textAlign: "center", marginTop: 12, letterSpacing: 1, fontWeight: 600 }}>
+              ADMIT ONE · NO PASSWORD REQUIRED
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-            {authMode === "signup" && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Name</label>
-                <input type="text" value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Your name"
-                  style={{
-                    width: "100%", padding: "11px 13px", borderRadius: 8,
-                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
-                    color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
-                    fontFamily: "'Inter', sans-serif",
-                  }} />
-              </div>
-            )}
-{authMode === "signup" && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>
-                  Your City
-                </label>
-                <input type="text" value={authCity}
-                  onChange={e => { setAuthCity(e.target.value); setAuthCoords(null); }}
-                  placeholder="Charlotte, NC"
-                  style={{
-                    width: "100%", padding: "11px 13px", borderRadius: 8,
-                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
-                    color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
-                    fontFamily: "'Inter', sans-serif",
-                    marginBottom: 6,
-                  }} />
-                <button type="button" onClick={detectLocation} disabled={detectingLocation}
-                  className="oswald"
-                  style={{
-                    background: "transparent", color: BRAND.greenDark,
-                    border: `1px solid ${BRAND.greenDark}`, borderRadius: 7,
-                    padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1,
-                    cursor: "pointer", width: "100%",
-                  }}>
-                  {detectingLocation ? "DETECTING..." : "📍 USE MY CURRENT LOCATION"}
-                </button>
-              </div>
-            )}
+  // ─────────────── COMPLETE PROFILE ────────────────
+  if (pendingProfile) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        backgroundColor: BRAND.slate,
+        backgroundImage: `radial-gradient(circle at 20% 20%, ${BRAND.greenGlow} 0%, transparent 40%), radial-gradient(circle at 80% 80%, rgba(124,194,66,0.08) 0%, transparent 40%)`,
+        fontFamily: "'Inter', sans-serif",
+        color: BRAND.cream,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .ticket-stub { position: relative; }
+          .ticket-stub::before, .ticket-stub::after {
+            content: ''; position: absolute; width: 16px; height: 16px;
+            background: ${BRAND.slate}; border-radius: 50%; top: 50%; transform: translateY(-50%);
+          }
+          .ticket-stub::before { left: -8px; }
+          .ticket-stub::after { right: -8px; }
+        `}</style>
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+              <LogoMark size={140} />
+            </div>
+            <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 14, letterSpacing: 2, textTransform: "uppercase", fontWeight: 500 }}>
+              One last step
+            </div>
+          </div>
+
+          <div className="ticket-stub" style={{
+            background: BRAND.cream,
+            borderRadius: 12,
+            padding: "26px 24px",
+            color: BRAND.charcoal,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+          }}>
+            <div className="oswald" style={{ fontSize: 18, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, color: BRAND.charcoal }}>
+              COMPLETE YOUR PROFILE
+            </div>
+            <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 20, fontWeight: 500 }}>
+              Signed in as <strong>{pendingProfile.email}</strong>
+            </div>
+
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
-              <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com"
-                onKeyDown={e => e.key === "Enter" && handleAuth()}
+              <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Your Name</label>
+              <input type="text" value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Your name"
                 style={{
                   width: "100%", padding: "11px 13px", borderRadius: 8,
                   background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
                   color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
                   fontFamily: "'Inter', sans-serif",
                 }} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Your City</label>
+              <input type="text" value={authCity}
+                onChange={e => { setAuthCity(e.target.value); setAuthCoords(null); }}
+                placeholder="Charlotte, NC"
+                style={{
+                  width: "100%", padding: "11px 13px", borderRadius: 8,
+                  background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                  color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
+                  fontFamily: "'Inter', sans-serif",
+                  marginBottom: 6,
+                }} />
+              <button type="button" onClick={detectLocation} disabled={detectingLocation}
+                className="oswald"
+                style={{
+                  background: "transparent", color: BRAND.greenDark,
+                  border: `1px solid ${BRAND.greenDark}`, borderRadius: 7,
+                  padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                  cursor: "pointer", width: "100%",
+                }}>
+                {detectingLocation ? "DETECTING..." : "📍 USE MY CURRENT LOCATION"}
+              </button>
             </div>
 
             {authError && (
@@ -809,7 +921,7 @@ const [schedule, setSchedule] = useState([]);
               }}>{authError}</div>
             )}
 
-            <button onClick={handleAuth} style={{
+            <button onClick={completeProfile} style={{
               width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
               background: BRAND.green, color: BRAND.charcoal,
               fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
@@ -819,9 +931,8 @@ const [schedule, setSchedule] = useState([]);
             }}
             onMouseDown={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 2px 0 ${BRAND.greenDark}`; }}
             onMouseUp={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 0 ${BRAND.greenDark}`; }}
-            >{authMode === "signup" ? "CREATE ACCOUNT" : "SIGN IN"} →</button>
+            >LET'S GO →</button>
 
-            {/* Ticket barcode strip */}
             <div style={{ marginTop: 18, display: "flex", justifyContent: "center", gap: 1.5, opacity: 0.4 }}>
               {[3,1,2,4,1,3,2,1,4,2,3,1,2,1,3,4,1,2,3,1,4,2,1,3].map((w, i) => (
                 <div key={i} style={{ width: w, height: 24, background: BRAND.charcoal }} />
