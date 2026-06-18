@@ -455,8 +455,9 @@ export default function RoadGame() {
   const [loading, setLoading] = useState(true);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [pendingProfile, setPendingProfile] = useState(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
-  const [view, setView] = useState("alerts");
+  const [view, setView] = useState("teams");
   const [activeLeague, setActiveLeague] = useState("nfl");
   const [search, setSearch] = useState("");
   const [following, setFollowing] = useState([]);
@@ -651,10 +652,11 @@ async function saveNewLocation() {
 
   async function signOut() {
     await signOutSupabase();
-    setUser(null); setFollowing([]); setActiveTeam(null); setView("alerts");
+    setUser(null); setFollowing([]); setActiveTeam(null); setView("teams");
   }
 
   function toggleFollow(team, league) {
+    if (!user) { setAuthOpen(true); return; }
     const exists = following.find(f => f.team === team && f.league === league);
     if (exists) { setFollowing(following.filter(f => !(f.team === team && f.league === league))); showToast(`Unfollowed ${team}`); }
     else { setFollowing([...following, { team, league }]); showToast(`Following ${team}`); }
@@ -719,115 +721,6 @@ const [schedule, setSchedule] = useState([]);
     return (
       <div style={{ minHeight: "100vh", background: BRAND.slate, display: "flex", alignItems: "center", justifyContent: "center", color: BRAND.muted, fontFamily: "'Oswald', sans-serif", letterSpacing: 2 }}>
         LOADING ROADGAME...
-      </div>
-    );
-  }
-
-  // ─────────────── AUTH SCREEN ────────────────
-  if (!user) {
-    return (
-      <div style={{
-        minHeight: "100vh",
-        backgroundColor: BRAND.slate,
-        backgroundImage: `radial-gradient(circle at 20% 20%, ${BRAND.greenGlow} 0%, transparent 40%), radial-gradient(circle at 80% 80%, rgba(124,194,66,0.08) 0%, transparent 40%)`,
-        fontFamily: "'Inter', sans-serif",
-        color: BRAND.cream,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
-      }}>
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-          * { box-sizing: border-box; }
-          .ticket-stub { position: relative; }
-          .ticket-stub::before, .ticket-stub::after {
-            content: ''; position: absolute; width: 16px; height: 16px;
-            background: ${BRAND.slate}; border-radius: 50%; top: 50%; transform: translateY(-50%);
-          }
-          .ticket-stub::before { left: -8px; }
-          .ticket-stub::after { right: -8px; }
-        `}</style>
-        <div style={{ width: "100%", maxWidth: 380 }}>
-          {/* Logo */}
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
-              <LogoMark size={140} />
-            </div>
-            <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 14, letterSpacing: 2, textTransform: "uppercase", fontWeight: 500 }}>
-              Follow Your Team · Plan The Trip
-            </div>
-          </div>
-
-          {/* Ticket-shaped auth card */}
-          <div className="ticket-stub" style={{
-            background: BRAND.cream,
-            borderRadius: 12,
-            padding: "26px 24px",
-            color: BRAND.charcoal,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-          }}>
-            {!magicLinkSent ? (
-              <>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
-                  <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com"
-                    onKeyDown={e => e.key === "Enter" && handleAuth()}
-                    style={{
-                      width: "100%", padding: "11px 13px", borderRadius: 8,
-                      background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
-                      color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
-                      fontFamily: "'Inter', sans-serif",
-                    }} />
-                </div>
-
-                {authError && (
-                  <div style={{
-                    background: "rgba(232,69,69,0.08)", border: `1.5px solid ${BRAND.red}`,
-                    color: BRAND.red, borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 12, fontWeight: 600,
-                  }}>{authError}</div>
-                )}
-
-                <button onClick={handleAuth} style={{
-                  width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
-                  background: BRAND.green, color: BRAND.charcoal,
-                  fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
-                  fontFamily: "'Oswald', sans-serif",
-                  boxShadow: `0 4px 0 ${BRAND.greenDark}`,
-                  transition: "transform 0.1s, box-shadow 0.1s",
-                }}
-                onMouseDown={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 2px 0 ${BRAND.greenDark}`; }}
-                onMouseUp={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 0 ${BRAND.greenDark}`; }}
-                >SEND MAGIC LINK →</button>
-              </>
-            ) : (
-              <div style={{ textAlign: "center", padding: "8px 0" }}>
-                <div style={{ fontSize: 48, marginBottom: 14 }}>📬</div>
-                <div className="oswald" style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1, color: BRAND.charcoal, marginBottom: 8 }}>
-                  CHECK YOUR EMAIL
-                </div>
-                <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 4, lineHeight: 1.5, fontWeight: 500 }}>
-                  Magic link sent to:
-                </div>
-                <div style={{ fontSize: 13, color: BRAND.charcoal, fontWeight: 700, marginBottom: 20 }}>{authEmail}</div>
-                <button onClick={() => { setMagicLinkSent(false); setAuthEmail(""); setAuthError(null); }} style={{
-                  background: "transparent", border: `1.5px solid rgba(45,58,66,0.3)`,
-                  color: BRAND.charcoal, borderRadius: 7, padding: "8px 16px",
-                  fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
-                  fontFamily: "'Oswald', sans-serif",
-                }}>USE A DIFFERENT EMAIL</button>
-              </div>
-            )}
-
-            {/* Ticket barcode strip */}
-            <div style={{ marginTop: 18, display: "flex", justifyContent: "center", gap: 1.5, opacity: 0.4 }}>
-              {[3,1,2,4,1,3,2,1,4,2,3,1,2,1,3,4,1,2,3,1,4,2,1,3].map((w, i) => (
-                <div key={i} style={{ width: w, height: 24, background: BRAND.charcoal }} />
-              ))}
-            </div>
-            <div style={{ fontSize: 10, color: BRAND.muted, textAlign: "center", marginTop: 12, letterSpacing: 1, fontWeight: 600 }}>
-              ADMIT ONE · NO PASSWORD REQUIRED
-            </div>
-          </div>
-        </div>
       </div>
     );
   }
@@ -974,6 +867,100 @@ const [schedule, setSchedule] = useState([]);
         }}>{toast}</div>
       )}
 
+      {/* Auth Modal */}
+      {authOpen && !user && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.78)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20,
+        }} onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 360,
+            background: BRAND.cream, borderRadius: 12,
+            padding: "28px 24px",
+            color: BRAND.charcoal,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            position: "relative",
+          }}>
+            <button onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }} style={{
+              position: "absolute", top: 12, right: 12,
+              background: "transparent", border: "none", cursor: "pointer",
+              fontSize: 18, color: BRAND.muted, lineHeight: 1, padding: 4,
+            }}>✕</button>
+
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <LogoMark size={80} />
+            </div>
+
+            {!magicLinkSent ? (
+              <>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, color: BRAND.charcoal }}>
+                  SIGN IN
+                </div>
+                <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 18, fontWeight: 500 }}>
+                  No password needed — we'll email you a magic link.
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "block", fontSize: 10, color: "#7A8890", marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleAuth()}
+                    placeholder="you@example.com"
+                    style={{
+                      width: "100%", padding: "11px 13px", borderRadius: 8,
+                      background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                      color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  />
+                </div>
+                {authError && (
+                  <div style={{
+                    background: "rgba(232,69,69,0.08)", border: `1.5px solid ${BRAND.red}`,
+                    color: BRAND.red, borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 12, fontWeight: 600,
+                  }}>{authError}</div>
+                )}
+                <button onClick={handleAuth} style={{
+                  width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: BRAND.green, color: BRAND.charcoal,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
+                  fontFamily: "'Oswald', sans-serif",
+                  boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+                }}>SEND MAGIC LINK →</button>
+              </>
+            ) : (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: BRAND.charcoal, marginBottom: 8 }}>
+                  CHECK YOUR EMAIL
+                </div>
+                <div style={{ fontSize: 13, color: "#5A6770", fontWeight: 500, lineHeight: 1.5, marginBottom: 18 }}>
+                  We sent a magic link to <strong>{authEmail}</strong>.<br />
+                  Click it to sign in — no password needed.
+                </div>
+                <button onClick={() => { setMagicLinkSent(false); setAuthEmail(""); setAuthError(null); }} style={{
+                  background: "transparent", border: `1.5px solid #9BA8B0`, borderRadius: 7,
+                  padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#5A6770",
+                  cursor: "pointer", fontFamily: "'Oswald', sans-serif", letterSpacing: 1,
+                }}>← USE DIFFERENT EMAIL</button>
+              </div>
+            )}
+
+            <div style={{ marginTop: 18, display: "flex", justifyContent: "center", gap: 1.5, opacity: 0.2 }}>
+              {[3,1,2,4,1,3,2,1,4,2,3,1,2,1,3,4,1,2,3,1,4,2,1,3].map((w, i) => (
+                <div key={i} style={{ width: w, height: 20, background: BRAND.charcoal }} />
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "#9BA8B0", textAlign: "center", marginTop: 10, letterSpacing: 1, fontWeight: 600 }}>
+              ADMIT ONE · NO PASSWORD REQUIRED
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         background: BRAND.slateDark,
@@ -995,12 +982,20 @@ const [schedule, setSchedule] = useState([]);
               fontFamily: "'Oswald', sans-serif",
             }}>● {weekAlerts.length} THIS WEEK</div>
           )}
-          <button onClick={() => setView("profile")} style={{
-            width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
-            background: view === "profile" ? BRAND.green : BRAND.slateLight,
-            color: view === "profile" ? BRAND.charcoal : BRAND.cream,
-            fontSize: 13, fontWeight: 800,
-          }}>{user.name[0].toUpperCase()}</button>
+          {user ? (
+            <button onClick={() => setView("profile")} style={{
+              width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
+              background: view === "profile" ? BRAND.green : BRAND.slateLight,
+              color: view === "profile" ? BRAND.charcoal : BRAND.cream,
+              fontSize: 13, fontWeight: 800,
+            }}>{user.name[0].toUpperCase()}</button>
+          ) : (
+            <button onClick={() => setAuthOpen(true)} className="oswald" style={{
+              padding: "5px 13px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: BRAND.green, color: BRAND.charcoal,
+              fontSize: 11, fontWeight: 700, letterSpacing: 1,
+            }}>SIGN IN</button>
+          )}
         </div>
       </div>
 
@@ -1023,7 +1018,7 @@ const [schedule, setSchedule] = useState([]);
       )}
 
       {/* ── PROFILE ── */}
-      {view === "profile" && (
+      {view === "profile" && user && (
         <div style={{ padding: "16px 14px", maxWidth: 500, margin: "0 auto" }}>
           <button onClick={() => setView("alerts")} className="oswald" style={{
             background: BRAND.slateLight, border: "none",
@@ -1159,7 +1154,7 @@ const [schedule, setSchedule] = useState([]);
         <div style={{ padding: "16px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div style={{ marginBottom: 14 }}>
             <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
-              HEY, {user.name.split(" ")[0].toUpperCase()}.
+              HEY{user ? `, ${user.name.split(" ")[0].toUpperCase()}` : ""}.
             </div>
             <div style={{ fontSize: 12, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>
               {weekAlerts.length > 0
