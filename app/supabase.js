@@ -1,22 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Fallbacks prevent a crash during Next.js SSR when .env.local isn't present.
-// Replace these with your real values in .env.local (or Vercel env settings).
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
-  { auth: { flowType: 'implicit' } }
 );
 
 export { supabase };
 
-export async function sendMagicLink(email) {
-  const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: redirectTo },
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+    },
   });
   if (error) throw error;
+}
+
+export async function sendOtpCode(email) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true },
+  });
+  if (error) throw error;
+}
+
+export async function verifyEmailOtp(email, token) {
+  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) throw error;
+  return data;
 }
 
 export async function getCurrentUser() {

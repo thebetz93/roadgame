@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
-import { sendMagicLink, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
+import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
 
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
 // SeatGeek: go to developer.seatgeek.com → Authentication → copy your client_id
@@ -321,12 +321,16 @@ export default function RoadGame() {
   const [editingLocation, setEditingLocation] = useState(false);
   const [newCity, setNewCity] = useState("");
   const [newCoords, setNewCoords] = useState(null);
-  // Location is per-user. Default to Fletcher, NC only as a fallback if profile has none.
-  const userLat = user?.lat ?? 35.4443;
-  const userLng = user?.lng ?? -82.5098;
-  const userCity = user?.city ?? "Fletcher, NC";
+  const [guestLoc, setGuestLoc] = useState({ city: '', lat: null, lng: null });
+  const [locPickerOpen, setLocPickerOpen] = useState(false);
+  const [locInput, setLocInput] = useState('');
+  const [locDetecting, setLocDetecting] = useState(false);
+  const userLat = user?.lat ?? guestLoc.lat ?? 35.4443;
+  const userLng = user?.lng ?? guestLoc.lng ?? -82.5098;
+  const userCity = user?.city || guestLoc.city || '';
   const [loading, setLoading] = useState(true);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [pendingProfile, setPendingProfile] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -345,6 +349,14 @@ export default function RoadGame() {
   const [alertRadius, setAlertRadius] = useState(350);
 
   useEffect(() => {
+    const hasMagicToken = typeof window !== 'undefined' && (window.location.hash.includes('access_token') || window.location.search.includes('code='));
+    const magicTimeout = hasMagicToken ? setTimeout(() => setLoading(false), 8000) : null;
+
+    try {
+      const saved = localStorage.getItem('roadgame:guestLoc');
+      if (saved) setGuestLoc(JSON.parse(saved));
+    } catch {}
+
     async function loadAuthedUser() {
       try {
         const supaUser = await getCurrentUser();
@@ -360,12 +372,13 @@ export default function RoadGame() {
           }
         }
       } catch (e) {}
-      setLoading(false);
+      if (!hasMagicToken) setLoading(false);
     }
     loadAuthedUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
+        clearTimeout(magicTimeout);
         const supaUser = session.user;
         const profile = await getMyProfile(supaUser.id);
         if (profile && profile.name && profile.city) {
@@ -380,12 +393,14 @@ export default function RoadGame() {
         setLoading(false);
       }
       if (event === 'SIGNED_OUT') {
+        clearTimeout(magicTimeout);
         setUser(null);
         setFollowing([]);
         setPendingProfile(null);
+        setLoading(false);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearTimeout(magicTimeout); };
   }, []);
 
   useEffect(() => {
@@ -410,10 +425,38 @@ export default function RoadGame() {
     const email = authEmail.trim().toLowerCase();
     if (!email || !email.includes("@") || !email.includes(".")) { setAuthError("Enter a valid email address"); return; }
     try {
-      await sendMagicLink(email);
-      setMagicLinkSent(true);
+      await sendOtpCode(email);
+      setOtpSent(true);
+      setOtpCode('');
     } catch (e) {
-      setAuthError(`Couldn't send magic link: ${e.message || "Please try again"}`);
+      const msg = e.message || '';
+      if (msg.toLowerCase().includes('security') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('after')) {
+        setAuthError("Too many attempts. Please wait a few minutes, then try again.");
+      } else {
+        setAuthError(msg || "Couldn't send code. Please try again.");
+      }
+    }
+  }
+
+  async function handleVerifyOtp() {
+    setAuthError(null);
+    const code = otpCode.trim();
+    if (code.length < 6 || code.length > 8) { setAuthError("Enter the code from your email"); return; }
+    try {
+      await verifyEmailOtp(authEmail.trim().toLowerCase(), code);
+      setAuthOpen(false);
+      setOtpSent(false);
+      setOtpCode('');
+      setAuthEmail('');
+    } catch (e) {
+      const msg = e.message || '';
+      if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('otp')) {
+        setAuthError("That code is incorrect or expired. Request a new one.");
+      } else if (msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('rate')) {
+        setAuthError("Too many attempts. Please wait a few minutes.");
+      } else {
+        setAuthError(msg || "Couldn't verify code. Try again.");
+      }
     }
   }
 async function saveNewLocation() {
@@ -464,6 +507,49 @@ async function saveNewLocation() {
       { timeout: 10000 }
     );
   }
+
+  async function saveLocPicker() {
+    const city = locInput.trim();
+    if (!city) { showToast("Enter a city first"); return; }
+    const geo = await geocodeCity(city);
+    if (!geo) { showToast(`Couldn't find "${city}". Try a major city nearby.`); return; }
+    if (user) {
+      const updatedUser = { ...user, city: geo.name, lat: geo.lat, lng: geo.lng };
+      setUser(updatedUser);
+      await upsertMyProfile({ id: user.id, email: user.email, name: user.name, city: geo.name, lat: geo.lat, lng: geo.lng, following, alerts_enabled: alertsEnabled, alert_radius: alertRadius }).catch(() => {});
+    } else {
+      const loc = { city: geo.name, lat: geo.lat, lng: geo.lng };
+      setGuestLoc(loc);
+      try { localStorage.setItem('roadgame:guestLoc', JSON.stringify(loc)); } catch {}
+    }
+    setLocPickerOpen(false);
+    setLocInput('');
+    showToast(`Location set to ${geo.name}`);
+  }
+
+  async function detectLocPicker() {
+    if (!navigator.geolocation) { showToast("Geolocation not supported by your browser"); return; }
+    setLocDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const { latitude, longitude } = pos.coords;
+        const cityName = await reverseGeocode(latitude, longitude);
+        setLocInput(cityName || '');
+        setLocDetecting(false);
+        if (!user && cityName) {
+          const loc = { city: cityName, lat: latitude, lng: longitude };
+          setGuestLoc(loc);
+          try { localStorage.setItem('roadgame:guestLoc', JSON.stringify(loc)); } catch {}
+          setLocPickerOpen(false);
+          setLocInput('');
+          showToast(`Location set to ${cityName}`);
+        }
+      },
+      () => { setLocDetecting(false); showToast("Location permission denied. Type your city manually."); },
+      { timeout: 10000 }
+    );
+  }
+
   async function detectLocation() {
     setAuthError(null);
     if (!navigator.geolocation) {
@@ -746,6 +832,54 @@ const [schedule, setSchedule] = useState([]);
         }}>{toast}</div>
       )}
 
+      {/* Location Picker Modal */}
+      {locPickerOpen && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.65)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20,
+        }} onClick={() => setLocPickerOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 320,
+            background: BRAND.slateDark, borderRadius: 12,
+            padding: "22px 20px",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            border: `1px solid rgba(255,255,255,0.08)`,
+          }}>
+            <div className="oswald" style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream, marginBottom: 14, letterSpacing: 0.5 }}>
+              YOUR LOCATION
+            </div>
+            <input
+              type="text"
+              value={locInput}
+              onChange={e => setLocInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && saveLocPicker()}
+              placeholder="City, State"
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 8, marginBottom: 8,
+                background: BRAND.slate, border: `1.5px solid rgba(255,255,255,0.12)`,
+                color: BRAND.cream, fontSize: 14, outline: "none",
+                fontFamily: "'Inter', sans-serif",
+              }}
+            />
+            <button onClick={detectLocPicker} style={{
+              width: "100%", padding: "9px", borderRadius: 8, border: `1.5px solid rgba(255,255,255,0.15)`,
+              background: "transparent", color: BRAND.muted,
+              fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: "pointer",
+              fontFamily: "'Oswald', sans-serif", marginBottom: 8,
+            }}>{locDetecting ? "DETECTING..." : "📍 USE MY LOCATION"}</button>
+            <button onClick={saveLocPicker} style={{
+              width: "100%", padding: "11px", borderRadius: 8, border: "none",
+              background: BRAND.green, color: BRAND.charcoal,
+              fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer",
+              fontFamily: "'Oswald', sans-serif",
+              boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+            }}>SAVE LOCATION →</button>
+          </div>
+        </div>
+      )}
+
       {/* Auth Modal */}
       {authOpen && !user && (
         <div style={{
@@ -753,7 +887,7 @@ const [schedule, setSchedule] = useState([]);
           background: "rgba(0,0,0,0.78)",
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: 20,
-        }} onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }}>
+        }} onClick={() => { setAuthOpen(false); setOtpSent(false); setOtpCode(''); setAuthError(null); setAuthEmail(""); }}>
           <div onClick={e => e.stopPropagation()} style={{
             width: "100%", maxWidth: 360,
             background: BRAND.cream, borderRadius: 12,
@@ -762,7 +896,7 @@ const [schedule, setSchedule] = useState([]);
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
             position: "relative",
           }}>
-            <button onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }} style={{
+            <button onClick={() => { setAuthOpen(false); setOtpSent(false); setOtpCode(''); setAuthError(null); setAuthEmail(""); }} style={{
               position: "absolute", top: 12, right: 12,
               background: "transparent", border: "none", cursor: "pointer",
               fontSize: 18, color: BRAND.muted, lineHeight: 1, padding: 4,
@@ -772,13 +906,32 @@ const [schedule, setSchedule] = useState([]);
               <LogoMark size={80} />
             </div>
 
-            {!magicLinkSent ? (
+            {!otpSent ? (
               <>
                 <div className="oswald" style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, color: BRAND.charcoal }}>
                   SIGN IN
                 </div>
                 <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 18, fontWeight: 500 }}>
-                  No password needed — we'll email you a magic link.
+                  Sign in to save your teams and preferences.
+                </div>
+                <button
+                  onClick={async () => { try { await signInWithGoogle(); } catch(e) { setAuthError(e.message); } }}
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: 8, border: `1.5px solid rgba(45,58,66,0.2)`,
+                    background: BRAND.white, color: BRAND.charcoal, cursor: "pointer",
+                    fontSize: 13, fontWeight: 600, letterSpacing: 0.3,
+                    fontFamily: "'Inter', sans-serif",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                    marginBottom: 16,
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+                  Continue with Google
+                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <div style={{ flex: 1, height: 1, background: "rgba(45,58,66,0.12)" }} />
+                  <span style={{ fontSize: 11, color: "#9AA5AD", fontWeight: 600, letterSpacing: 1 }}>OR</span>
+                  <div style={{ flex: 1, height: 1, background: "rgba(45,58,66,0.12)" }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: "block", fontSize: 10, color: "#7A8890", marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
@@ -808,20 +961,48 @@ const [schedule, setSchedule] = useState([]);
                   fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
                   fontFamily: "'Oswald', sans-serif",
                   boxShadow: `0 4px 0 ${BRAND.greenDark}`,
-                }}>SEND MAGIC LINK →</button>
+                }}>SEND CODE →</button>
               </>
             ) : (
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
-                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: BRAND.charcoal, marginBottom: 8 }}>
-                  CHECK YOUR EMAIL
+              <div>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: BRAND.charcoal, marginBottom: 4 }}>
+                  ENTER YOUR CODE
                 </div>
-                <div style={{ fontSize: 13, color: "#5A6770", fontWeight: 500, lineHeight: 1.5, marginBottom: 18 }}>
-                  We sent a magic link to <strong>{authEmail}</strong>.<br />
-                  Click it to sign in — no password needed.
+                <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 16, fontWeight: 500 }}>
+                  We sent a sign-in code to <strong>{authEmail}</strong>
                 </div>
-                <button onClick={() => { setMagicLinkSent(false); setAuthEmail(""); setAuthError(null); }} style={{
-                  background: "transparent", border: `1.5px solid #9BA8B0`, borderRadius: 7,
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={otpCode}
+                  onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '')); setAuthError(null); }}
+                  onKeyDown={e => e.key === "Enter" && handleVerifyOtp()}
+                  placeholder="00000000"
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "14px 13px", borderRadius: 8, marginBottom: 12,
+                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                    color: BRAND.charcoal, fontSize: 28, outline: "none", fontWeight: 700,
+                    fontFamily: "'Oswald', sans-serif", letterSpacing: 10, textAlign: "center",
+                  }}
+                />
+                {authError && (
+                  <div style={{
+                    background: "rgba(232,69,69,0.08)", border: `1.5px solid ${BRAND.red}`,
+                    color: BRAND.red, borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 12, fontWeight: 600,
+                  }}>{authError}</div>
+                )}
+                <button onClick={handleVerifyOtp} style={{
+                  width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: BRAND.green, color: BRAND.charcoal,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
+                  fontFamily: "'Oswald', sans-serif",
+                  boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+                  marginBottom: 10,
+                }}>VERIFY CODE →</button>
+                <button onClick={() => { setOtpSent(false); setOtpCode(''); setAuthError(null); }} style={{
+                  width: "100%", background: "transparent", border: `1.5px solid #9BA8B0`, borderRadius: 7,
                   padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#5A6770",
                   cursor: "pointer", fontFamily: "'Oswald', sans-serif", letterSpacing: 1,
                 }}>← USE DIFFERENT EMAIL</button>
@@ -849,9 +1030,19 @@ const [schedule, setSchedule] = useState([]);
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <LogoMark size={36} />
-          <div style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
-            {userCity}
-          </div>
+          <button onClick={() => { setLocInput(userCity); setLocPickerOpen(true); }} style={{
+            background: "transparent", border: "none", cursor: "pointer", padding: 0,
+          }}>
+            {userCity ? (
+              <div style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
+                {userCity}
+              </div>
+            ) : (
+              <div style={{ fontSize: 9, color: BRAND.green, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
+                📍 SET LOCATION
+              </div>
+            )}
+          </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           {weekAlerts.length > 0 && (
@@ -1013,9 +1204,19 @@ const [schedule, setSchedule] = useState([]);
 
           <SectionCard title="YOUR STATS">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              <Stat value={following.length} label="TEAMS" />
-              <Stat value={alerts.length} label="ALERTS/MO" accent={BRAND.green} />
-              <Stat value={weekAlerts.length} label="THIS WEEK" accent={weekAlerts.length > 0 ? BRAND.red : BRAND.cream} />
+              {[
+                { value: following.length, label: "TEAMS", accent: BRAND.cream, target: "teams" },
+                { value: alerts.length, label: "ALERTS", accent: BRAND.green, target: "alerts" },
+                { value: weekAlerts.length, label: "THIS WEEK", accent: weekAlerts.length > 0 ? BRAND.red : BRAND.cream, target: "alerts" },
+              ].map(({ value, label, accent, target }) => (
+                <button key={label} onClick={() => setView(target)} style={{
+                  background: BRAND.slateDark, borderRadius: 8, padding: "9px 10px",
+                  border: "none", cursor: "pointer", textAlign: "left",
+                }}>
+                  <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.2, fontWeight: 700 }}>{label}</div>
+                  <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: accent, lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+                </button>
+              ))}
             </div>
           </SectionCard>
 
