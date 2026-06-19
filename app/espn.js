@@ -1,6 +1,4 @@
-// app/espn.js — ESPN unofficial API for real team schedules (no API key required)
-// The site.api.espn.com endpoints are publicly accessible and support CORS.
-
+// app/espn.js — ESPN public schedule API, no API key required
 import { VENUES } from './venues';
 
 const BASE = 'https://site.api.espn.com/apis/site/v2/sports';
@@ -12,10 +10,55 @@ const SPORT = {
   nhl: 'hockey/nhl',
 };
 
-// ESPN uses the ending year for seasons that span two calendar years
-// e.g. 2025-26 NBA season = season=2026
-// In June 2026, always querying 2026 is correct for all sports
-function espnSeason() { return new Date().getFullYear(); }
+// Hardcoded ESPN abbreviations — skips the unreliable team-search lookup
+const ABBR = {
+  // NFL
+  "Arizona Cardinals":"ari","Atlanta Falcons":"atl","Baltimore Ravens":"bal",
+  "Buffalo Bills":"buf","Carolina Panthers":"car","Chicago Bears":"chi",
+  "Cincinnati Bengals":"cin","Cleveland Browns":"cle","Dallas Cowboys":"dal",
+  "Denver Broncos":"den","Detroit Lions":"det","Green Bay Packers":"gb",
+  "Houston Texans":"hou","Indianapolis Colts":"ind","Jacksonville Jaguars":"jax",
+  "Kansas City Chiefs":"kc","Las Vegas Raiders":"lv","Los Angeles Chargers":"lac",
+  "Los Angeles Rams":"lar","Miami Dolphins":"mia","Minnesota Vikings":"min",
+  "New England Patriots":"ne","New Orleans Saints":"no","New York Giants":"nyg",
+  "New York Jets":"nyj","Philadelphia Eagles":"phi","Pittsburgh Steelers":"pit",
+  "San Francisco 49ers":"sf","Seattle Seahawks":"sea","Tampa Bay Buccaneers":"tb",
+  "Tennessee Titans":"ten","Washington Commanders":"wsh",
+  // NBA
+  "Atlanta Hawks":"atl","Boston Celtics":"bos","Brooklyn Nets":"bkn",
+  "Charlotte Hornets":"cha","Chicago Bulls":"chi","Cleveland Cavaliers":"cle",
+  "Dallas Mavericks":"dal","Denver Nuggets":"den","Detroit Pistons":"det",
+  "Golden State Warriors":"gs","Houston Rockets":"hou","Indiana Pacers":"ind",
+  "LA Clippers":"lac","Los Angeles Lakers":"lal","Memphis Grizzlies":"mem",
+  "Miami Heat":"mia","Milwaukee Bucks":"mil","Minnesota Timberwolves":"min",
+  "New Orleans Pelicans":"no","New York Knicks":"ny","Oklahoma City Thunder":"okc",
+  "Orlando Magic":"orl","Philadelphia 76ers":"phi","Phoenix Suns":"phx",
+  "Portland Trail Blazers":"por","Sacramento Kings":"sac","San Antonio Spurs":"sa",
+  "Toronto Raptors":"tor","Utah Jazz":"utah","Washington Wizards":"wsh",
+  // MLB
+  "Arizona Diamondbacks":"ari","Atlanta Braves":"atl","Baltimore Orioles":"bal",
+  "Boston Red Sox":"bos","Chicago Cubs":"chc","Chicago White Sox":"cws",
+  "Cincinnati Reds":"cin","Cleveland Guardians":"cle","Colorado Rockies":"col",
+  "Detroit Tigers":"det","Houston Astros":"hou","Kansas City Royals":"kc",
+  "Los Angeles Angels":"laa","Los Angeles Dodgers":"lad","Miami Marlins":"mia",
+  "Milwaukee Brewers":"mil","Minnesota Twins":"min","New York Mets":"nym",
+  "New York Yankees":"nyy","Athletics":"oak","Philadelphia Phillies":"phi",
+  "Pittsburgh Pirates":"pit","San Diego Padres":"sd","San Francisco Giants":"sf",
+  "Seattle Mariners":"sea","St. Louis Cardinals":"stl","Tampa Bay Rays":"tb",
+  "Texas Rangers":"tex","Toronto Blue Jays":"tor","Washington Nationals":"wsh",
+  // NHL
+  "Anaheim Ducks":"ana","Boston Bruins":"bos","Buffalo Sabres":"buf",
+  "Calgary Flames":"cgy","Carolina Hurricanes":"car","Chicago Blackhawks":"chi",
+  "Colorado Avalanche":"col","Columbus Blue Jackets":"cbj","Dallas Stars":"dal",
+  "Detroit Red Wings":"det","Edmonton Oilers":"edm","Florida Panthers":"fla",
+  "Los Angeles Kings":"lak","Minnesota Wild":"min","Montreal Canadiens":"mtl",
+  "Nashville Predators":"nsh","New Jersey Devils":"njd","New York Islanders":"nyi",
+  "New York Rangers":"nyr","Ottawa Senators":"ott","Philadelphia Flyers":"phi",
+  "Pittsburgh Penguins":"pit","San Jose Sharks":"sjs","Seattle Kraken":"sea",
+  "St. Louis Blues":"stl","Tampa Bay Lightning":"tbl","Toronto Maple Leafs":"tor",
+  "Utah Mammoth":"uta","Vancouver Canucks":"van","Vegas Golden Knights":"vgk",
+  "Washington Capitals":"wsh","Winnipeg Jets":"wpg",
+};
 
 const API_ALIAS = {
   'Los Angeles Clippers': 'LA Clippers',
@@ -33,38 +76,12 @@ function resolveVenueKey(displayName) {
   return Object.keys(VENUES).find(k => k.split(' ').pop().toLowerCase() === nick) || null;
 }
 
-// Session cache so we only look up each team's ESPN ID once
-const teamIdCache = {};
-
-async function getTeamId(teamName, league) {
-  const cacheKey = `${league}:${teamName}`;
-  if (teamIdCache[cacheKey] != null) return teamIdCache[cacheKey];
-
-  const path = SPORT[league];
-  if (!path) return null;
-
-  const url = `${BASE}/${path}/teams?limit=100`;
-  console.log(`[ESPN] team lookup: ${url}`);
-  const res = await fetch(url);
-  if (!res.ok) { console.warn(`[ESPN] team list ${res.status}`); return null; }
-
-  const json = await res.json();
-  const teams = json.sports?.[0]?.leagues?.[0]?.teams?.map(t => t.team) || [];
-  const nameLower = teamName.toLowerCase();
-  const nick = teamName.split(' ').pop().toLowerCase();
-
-  const match =
-    teams.find(t => t.displayName?.toLowerCase() === nameLower) ||
-    teams.find(t => t.nickname?.toLowerCase() === nick) ||
-    teams.find(t => t.displayName?.toLowerCase().includes(nick));
-
-  if (match?.id) {
-    teamIdCache[cacheKey] = match.id;
-    console.log(`[ESPN] matched "${teamName}" → ${match.displayName} (id=${match.id})`);
-  } else {
-    console.warn(`[ESPN] no match for "${teamName}" in ${league}`, teams.map(t => t.displayName));
-  }
-  return match?.id ?? null;
+function season(league) {
+  const y = new Date().getFullYear();
+  const m = new Date().getMonth();
+  // NFL: Jan-Feb → completed season (prev year), Mar+ → upcoming season (this year)
+  if (league === 'nfl') return m <= 1 ? y - 1 : y;
+  return y;
 }
 
 function parseEvent(event, ourTeam) {
@@ -79,7 +96,7 @@ function parseEvent(event, ourTeam) {
   if (!homeComp || !awayComp) return null;
 
   const homeApi = homeComp.team?.displayName;
-  const awayApi = awayComp.team?.displayName;
+  const awayApi  = awayComp.team?.displayName;
 
   const homeKey = resolveVenueKey(homeApi);
   if (!homeKey) return null;
@@ -111,23 +128,23 @@ function parseEvent(event, ourTeam) {
 
 export async function fetchTeamSchedule(teamName, league) {
   const path = SPORT[league];
-  if (!path) return null;
+  const abbr = ABBR[teamName];
+  if (!path || !abbr) {
+    console.warn(`[ESPN] no mapping for "${teamName}" (${league})`);
+    return null;
+  }
+
+  const yr = season(league);
+  const url = `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}`;
+  console.log(`[ESPN] ${teamName} → ${url}`);
 
   try {
-    const season = espnSeason();
-    console.log(`[ESPN] ${teamName} (${league}) season=${season}`);
-
-    const teamId = await getTeamId(teamName, league);
-    if (teamId == null) return null;
-
-    const url = `${BASE}/${path}/teams/${teamId}/schedule?season=${season}`;
-    console.log(`[ESPN] schedule: ${url}`);
     const res = await fetch(url);
-    if (!res.ok) { console.warn(`[ESPN] schedule ${res.status}`); return null; }
+    if (!res.ok) { console.warn(`[ESPN] HTTP ${res.status}`); return null; }
 
     const json = await res.json();
     const events = json.events || [];
-    console.log(`[ESPN] ${events.length} total events for ${teamName}`);
+    console.log(`[ESPN] ${events.length} total events`);
 
     const now = new Date();
     const upcoming = events
@@ -135,10 +152,10 @@ export async function fetchTeamSchedule(teamName, league) {
       .filter(g => g !== null && new Date(g.dateISO) > now)
       .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
 
-    console.log(`[ESPN] ${upcoming.length} upcoming games`);
+    console.log(`[ESPN] ${upcoming.length} upcoming for ${teamName}`);
     return upcoming;
   } catch (err) {
-    console.warn('[ESPN] fetch error:', err);
+    console.warn('[ESPN] error:', err);
     return null;
   }
 }

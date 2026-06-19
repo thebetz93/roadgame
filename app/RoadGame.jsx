@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchTeamSchedule } from "./ticketmaster";
+import { fetchTeamSchedule } from "./espn";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendMagicLink, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
