@@ -6,7 +6,7 @@ import { sendMagicLink, getCurrentUser, getMyProfile, upsertMyProfile, signOutSu
 
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
 // SeatGeek: go to developer.seatgeek.com → Authentication → copy your client_id
-const SEATGEEK_CLIENT_ID = "";
+const SEATGEEK_CLIENT_ID = "NDc4NzgwMTl8MTc4MTgyNjA5OS45MDgzMzM";
 // Expedia Travel Creator: go to your creator dashboard → copy your creator/affiliate ID
 const EXPEDIA_CREATOR_ID = "";
 
