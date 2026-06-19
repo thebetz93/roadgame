@@ -7,6 +7,16 @@ const supabase = createClient(
 
 export { supabase };
 
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+    },
+  });
+  if (error) throw error;
+}
+
 export async function sendOtpCode(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
