@@ -1457,7 +1457,9 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
 
       {travelTab === "tickets" && (() => {
         const teamQ = encodeURIComponent(activeTeam.team);
-        const sgUrl = `https://seatgeek.com/search?q=${teamQ}${SEATGEEK_CLIENT_ID ? `&client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
+        // SeatGeek uses hash-based routing for search, so use the stable performer page URL instead
+        const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const sgUrl = `https://seatgeek.com/${sgSlug}-tickets${SEATGEEK_CLIENT_ID ? `?client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
         const vendors = [
           { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49", url: sgUrl, highlight: !!SEATGEEK_CLIENT_ID },
           { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${teamQ}` },
