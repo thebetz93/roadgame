@@ -1466,16 +1466,39 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
           { name: "StubHub", desc: "Resale guarantee", color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${teamQ}` },
           { name: "Vivid Seats", desc: "Rewards program", color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${teamQ}` },
         ];
+        const [sg, ...rest] = vendors;
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ background: BRAND.slateLight, borderRadius: 8, padding: "8px 12px", marginBottom: 2 }}>
               <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: BRAND.green }}>FIND TICKETS · {matchup.toUpperCase()}</div>
               <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>Compare prices across all major sellers</div>
             </div>
-            {vendors.map(v => (
+
+            {/* SeatGeek — featured card */}
+            <a href={sg.url} target="_blank" rel="noopener noreferrer" style={{
+              background: "rgba(124,194,66,0.10)",
+              border: `2px solid ${BRAND.green}`,
+              borderRadius: 10, padding: "14px 14px", textDecoration: "none",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="oswald" style={{ width: 36, height: 36, borderRadius: 8, background: sg.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>S</div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream }}>{sg.name}</div>
+                    <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, background: BRAND.green, color: BRAND.charcoal, borderRadius: 4, padding: "2px 6px" }}>BEST PICK</div>
+                  </div>
+                  <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>Deal Score rated · Best prices guaranteed</div>
+                </div>
+              </div>
+              <div className="oswald" style={{ fontSize: 12, color: BRAND.green, fontWeight: 700, letterSpacing: 1, whiteSpace: "nowrap" }}>GET TICKETS →</div>
+            </a>
+
+            {/* Other vendors */}
+            {rest.map(v => (
               <a key={v.name} href={v.url} target="_blank" rel="noopener noreferrer" style={{
                 background: BRAND.slateLight,
-                border: v.highlight ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                border: `1px solid rgba(245,239,226,0.06)`,
                 borderRadius: 8, padding: "10px 12px", textDecoration: "none",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
@@ -1488,7 +1511,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
                     <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{v.desc}</div>
                   </div>
                 </div>
-                <div className="oswald" style={{ fontSize: 11, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>GET TICKETS →</div>
+                <div className="oswald" style={{ fontSize: 11, color: BRAND.muted, fontWeight: 700, letterSpacing: 1 }}>GET TICKETS →</div>
               </a>
             ))}
           </div>
