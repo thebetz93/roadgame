@@ -1013,9 +1013,19 @@ const [schedule, setSchedule] = useState([]);
 
           <SectionCard title="YOUR STATS">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              <Stat value={following.length} label="TEAMS" />
-              <Stat value={alerts.length} label="ALERTS/MO" accent={BRAND.green} />
-              <Stat value={weekAlerts.length} label="THIS WEEK" accent={weekAlerts.length > 0 ? BRAND.red : BRAND.cream} />
+              {[
+                { value: following.length, label: "TEAMS", accent: BRAND.cream, target: "teams" },
+                { value: alerts.length, label: "ALERTS", accent: BRAND.green, target: "alerts" },
+                { value: weekAlerts.length, label: "THIS WEEK", accent: weekAlerts.length > 0 ? BRAND.red : BRAND.cream, target: "alerts" },
+              ].map(({ value, label, accent, target }) => (
+                <button key={label} onClick={() => setView(target)} style={{
+                  background: BRAND.slateDark, borderRadius: 8, padding: "9px 10px",
+                  border: "none", cursor: "pointer", textAlign: "left",
+                }}>
+                  <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.2, fontWeight: 700 }}>{label}</div>
+                  <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: accent, lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+                </button>
+              ))}
             </div>
           </SectionCard>
 
