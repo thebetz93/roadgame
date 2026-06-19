@@ -13,14 +13,18 @@ function currentSeason(leagueStartMonth) {
 }
 
 const CFG = {
-  // NFL starts September (month 8) — season labeled by year it starts
-  nfl: { base: 'https://v1.american-football.api-sports.io', league: 1,   get season() { return currentSeason(8); } },
+  // NFL: Jan-Feb = previous year (still in playoffs); Mar-Aug = current year (upcoming season, schedule released May); Sep-Dec = current year
+  nfl: { base: 'https://v1.american-football.api-sports.io', league: 1, teamSearch: 'search',
+    get season() { const m = new Date().getMonth(); return m <= 1 ? new Date().getFullYear() - 1 : new Date().getFullYear(); } },
   // NBA starts October (month 9)
-  nba: { base: 'https://v2.nba.api-sports.io',               league: null, get season() { return currentSeason(9); } },
-  // MLB is calendar year (starts March, month 2)
-  mlb: { base: 'https://v1.baseball.api-sports.io',          league: 1,   get season() { return new Date().getFullYear(); } },
+  nba: { base: 'https://v2.nba.api-sports.io', league: null, teamSearch: 'search',
+    get season() { return currentSeason(9); } },
+  // MLB is calendar year — baseball API uses 'name' not 'search' for team lookup
+  mlb: { base: 'https://v1.baseball.api-sports.io', league: 1, teamSearch: 'name',
+    get season() { return new Date().getFullYear(); } },
   // NHL starts October (month 9)
-  nhl: { base: 'https://v1.hockey.api-sports.io',            league: 57,  get season() { return currentSeason(9); } },
+  nhl: { base: 'https://v1.hockey.api-sports.io', league: 57, teamSearch: 'search',
+    get season() { return currentSeason(9); } },
 };
 
 // API-Sports occasionally uses different names than our VENUES keys
@@ -51,12 +55,24 @@ async function getTeamId(teamName, league) {
   if (!cfg) return null;
 
   const nickname = teamName.split(' ').pop();
-  let url = `${cfg.base}/teams?search=${encodeURIComponent(nickname)}`;
-  if (cfg.league) url += `&league=${cfg.league}`;
+  const searchParam = cfg.teamSearch || 'search';
+  let url = `${cfg.base}/teams?${searchParam}=${encodeURIComponent(nickname)}`;
+  if (cfg.league) url += `&league=${cfg.league}&season=${cfg.season}`;
 
+  console.log(`[API-Sports] team search: ${url}`);
   const res = await fetch(url, { headers: hdrs() });
-  if (!res.ok) return null;
-  const { response: teams = [] } = await res.json();
+  console.log(`[API-Sports] team search status: ${res.status}`);
+  if (!res.ok) {
+    console.warn(`[API-Sports] HTTP error ${res.status} looking up ${teamName}`);
+    return null;
+  }
+  const json = await res.json();
+  if (json.errors && Object.keys(json.errors).length) {
+    console.warn(`[API-Sports] ${league} API errors:`, json.errors);
+    return null;
+  }
+  const { response: teams = [] } = json;
+  console.log(`[API-Sports] found ${teams.length} team(s) for "${nickname}":`, teams.map(t => t.name));
 
   const wantLower = teamName.toLowerCase();
   // Also try the API alias (e.g. "Los Angeles Clippers" when we store "LA Clippers")
@@ -68,6 +84,7 @@ async function getTeamId(teamName, league) {
     teams.find(t => (t.name || '').toLowerCase().includes(nickname.toLowerCase())) ||
     (teams.length === 1 ? teams[0] : null);
 
+  console.log(`[API-Sports] matched team: ${match?.name} (id=${match?.id})`);
   if (match?.id != null) idCache[ck] = match.id;
   return match?.id ?? null;
 }
@@ -77,9 +94,19 @@ async function getGames(teamId, league) {
   let url = `${cfg.base}/games?team=${teamId}&season=${cfg.season}`;
   if (cfg.league) url += `&league=${cfg.league}`;
 
+  console.log(`[API-Sports] games fetch: ${url}`);
   const res = await fetch(url, { headers: hdrs() });
-  if (!res.ok) return [];
-  const { response = [] } = await res.json();
+  if (!res.ok) {
+    console.warn(`[API-Sports] games HTTP error: ${res.status}`);
+    return [];
+  }
+  const json = await res.json();
+  if (json.errors && Object.keys(json.errors).length) {
+    console.warn(`[API-Sports] games API errors:`, json.errors);
+    return [];
+  }
+  const { response = [] } = json;
+  console.log(`[API-Sports] got ${response.length} games`);
   return response;
 }
 
@@ -189,8 +216,10 @@ export async function fetchTeamSchedule(teamName, league) {
     const cfg = CFG[league];
     console.log(`[API-Sports] ${teamName} (${league}) season=${cfg?.season}`);
     const teamId = await getTeamId(teamName, league);
-    console.log(`[API-Sports] teamId=${teamId}`);
-    if (teamId == null) return null;
+    if (teamId == null) {
+      console.warn(`[API-Sports] could not find team ID for ${teamName} — check API subscription at api-sports.io`);
+      return null;
+    }
 
     const raw = await getGames(teamId, league);
     if (!raw.length) return [];
@@ -199,9 +228,11 @@ export async function fetchTeamSchedule(teamName, league) {
     if (!parser) return null;
 
     const now = new Date();
-    return parser(raw, teamName)
+    const upcoming = parser(raw, teamName)
       .filter(g => new Date(g.dateISO) > now)
       .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
+    console.log(`[API-Sports] ${upcoming.length} upcoming games for ${teamName}`);
+    return upcoming;
   } catch (err) {
     console.warn('API-Sports fetch error:', err);
     return null;
