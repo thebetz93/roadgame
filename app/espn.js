@@ -62,10 +62,10 @@ const ABBR = {
   // CFB - SEC
   "Alabama Crimson Tide":"ala","Arkansas Razorbacks":"ark","Auburn Tigers":"aub",
   "Florida Gators":"fla","Georgia Bulldogs":"uga","Kentucky Wildcats":"uk",
-  "LSU Tigers":"lsu","Mississippi State Bulldogs":"msst","Missouri Tigers":"mo",
-  "Oklahoma Sooners":"okla","Ole Miss Rebels":"miss","South Carolina Gamecocks":"sc",
+  "LSU Tigers":"lsu","Mississippi State Bulldogs":"msst","Missouri Tigers":"mizzou",
+  "Oklahoma Sooners":"okla","Ole Miss Rebels":"miss","South Carolina Gamecocks":"scar",
   "Tennessee Volunteers":"tenn","Texas Longhorns":"tex","Texas A&M Aggies":"tamu",
-  "Vanderbilt Commodores":"van",
+  "Vanderbilt Commodores":"vand",
   // CFB - Big Ten
   "Illinois Fighting Illini":"ill","Indiana Hoosiers":"ind","Iowa Hawkeyes":"iowa",
   "Maryland Terrapins":"md","Michigan Wolverines":"mich","Michigan State Spartans":"msu",
@@ -74,10 +74,10 @@ const ABBR = {
   "Rutgers Scarlet Knights":"rutg","Wisconsin Badgers":"wis","UCLA Bruins":"ucla",
   "USC Trojans":"usc","Oregon Ducks":"ore","Washington Huskies":"wash",
   // CFB - Big 12
-  "Arizona Wildcats":"ariz","Arizona State Sun Devils":"asu","Baylor Bears":"bay",
-  "BYU Cougars":"byu","Cincinnati Bearcats":"cin","Colorado Buffaloes":"colo",
+  "Arizona Wildcats":"ariz","Arizona State Sun Devils":"asu","Baylor Bears":"baylor",
+  "BYU Cougars":"byu","Cincinnati Bearcats":"cinci","Colorado Buffaloes":"colo",
   "Houston Cougars":"hou","Iowa State Cyclones":"iast","Kansas Jayhawks":"kan",
-  "Kansas State Wildcats":"ksu","Oklahoma State Cowboys":"okst","TCU Horned Frogs":"tcu",
+  "Kansas State Wildcats":"kstate","Oklahoma State Cowboys":"okst","TCU Horned Frogs":"tcu",
   "Texas Tech Red Raiders":"ttu","UCF Knights":"ucf","Utah Utes":"utah",
   "West Virginia Mountaineers":"wvu",
   // CFB - ACC
