@@ -683,10 +683,9 @@ const [schedule, setSchedule] = useState([]);
 
   // ─────────────── LOADING ────────────────
   if (loading) {
-    const isVerifying = typeof window !== 'undefined' && (window.location.hash.includes('access_token') || window.location.search.includes('code='));
     return (
       <div style={{ minHeight: "100vh", background: BRAND.slate, display: "flex", alignItems: "center", justifyContent: "center", color: BRAND.muted, fontFamily: "'Oswald', sans-serif", letterSpacing: 2 }}>
-        {isVerifying ? 'SIGNING YOU IN...' : 'LOADING ROADGAME...'}
+        LOADING ROADGAME...
       </div>
     );
   }
