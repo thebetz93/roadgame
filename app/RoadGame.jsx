@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchTeamSchedule } from "./ticketmaster";
+import { fetchTeamSchedule } from "./espn";
+import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
+import { sendMagicLink, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
+
+// ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
+// SeatGeek: go to developer.seatgeek.com → Authentication → copy your client_id
+const SEATGEEK_CLIENT_ID = "NDc4NzgwMTl8MTc4MTgyNjA5OS45MDgzMzM";
+// Expedia Travel Creator: go to your creator dashboard → copy your creator/affiliate ID
+const EXPEDIA_CREATOR_ID = "expedia-usa.kAAZVLH";
 
 // ─── BRAND PALETTE (matched to logo) ──────────────────────────────────────────
 const BRAND = {
@@ -61,141 +69,7 @@ function haversine(lat1, lon1, lat2, lon2) {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
-// ─── VENUE DATABASE ────────────────────────────────────────────────────────────
-const VENUES = {
-  "Arizona Cardinals":     { v: "State Farm Stadium",        c: "Glendale, AZ",      lat: 33.5276, lng: -112.2626 },
-  "Atlanta Falcons":       { v: "Mercedes-Benz Stadium",     c: "Atlanta, GA",       lat: 33.7554, lng: -84.4008 },
-  "Baltimore Ravens":      { v: "M&T Bank Stadium",          c: "Baltimore, MD",     lat: 39.2780, lng: -76.6227 },
-  "Buffalo Bills":         { v: "Highmark Stadium",          c: "Orchard Park, NY",  lat: 42.7738, lng: -78.7870 },
-  "Carolina Panthers":     { v: "Bank of America Stadium",   c: "Charlotte, NC",     lat: 35.2258, lng: -80.8528 },
-  "Chicago Bears":         { v: "Soldier Field",             c: "Chicago, IL",       lat: 41.8623, lng: -87.6167 },
-  "Cincinnati Bengals":    { v: "Paycor Stadium",            c: "Cincinnati, OH",    lat: 39.0954, lng: -84.5160 },
-  "Cleveland Browns":      { v: "Cleveland Browns Stadium",  c: "Cleveland, OH",     lat: 41.5061, lng: -81.6995 },
-  "Dallas Cowboys":        { v: "AT&T Stadium",              c: "Arlington, TX",     lat: 32.7473, lng: -97.0945 },
-  "Denver Broncos":        { v: "Empower Field",             c: "Denver, CO",        lat: 39.7439, lng: -105.0201 },
-  "Detroit Lions":         { v: "Ford Field",                c: "Detroit, MI",       lat: 42.3400, lng: -83.0456 },
-  "Green Bay Packers":     { v: "Lambeau Field",             c: "Green Bay, WI",     lat: 44.5013, lng: -88.0622 },
-  "Houston Texans":        { v: "NRG Stadium",               c: "Houston, TX",       lat: 29.6847, lng: -95.4107 },
-  "Indianapolis Colts":    { v: "Lucas Oil Stadium",         c: "Indianapolis, IN",  lat: 39.7601, lng: -86.1639 },
-  "Jacksonville Jaguars":  { v: "EverBank Stadium",          c: "Jacksonville, FL",  lat: 30.3239, lng: -81.6373 },
-  "Kansas City Chiefs":    { v: "Arrowhead Stadium",         c: "Kansas City, MO",   lat: 39.0489, lng: -94.4839 },
-  "Las Vegas Raiders":     { v: "Allegiant Stadium",         c: "Paradise, NV",      lat: 36.0908, lng: -115.1830 },
-  "Los Angeles Chargers":  { v: "SoFi Stadium",              c: "Inglewood, CA",     lat: 33.9534, lng: -118.3387 },
-  "Los Angeles Rams":      { v: "SoFi Stadium",              c: "Inglewood, CA",     lat: 33.9534, lng: -118.3387 },
-  "Miami Dolphins":        { v: "Hard Rock Stadium",         c: "Miami Gardens, FL", lat: 25.9580, lng: -80.2389 },
-  "Minnesota Vikings":     { v: "U.S. Bank Stadium",         c: "Minneapolis, MN",   lat: 44.9738, lng: -93.2580 },
-  "New England Patriots":  { v: "Gillette Stadium",          c: "Foxborough, MA",    lat: 42.0909, lng: -71.2643 },
-  "New Orleans Saints":    { v: "Caesars Superdome",         c: "New Orleans, LA",   lat: 29.9509, lng: -90.0815 },
-  "New York Giants":       { v: "MetLife Stadium",           c: "East Rutherford, NJ", lat: 40.8135, lng: -74.0745 },
-  "New York Jets":         { v: "MetLife Stadium",           c: "East Rutherford, NJ", lat: 40.8135, lng: -74.0745 },
-  "Philadelphia Eagles":   { v: "Lincoln Financial Field",   c: "Philadelphia, PA",  lat: 39.9008, lng: -75.1675 },
-  "Pittsburgh Steelers":   { v: "Acrisure Stadium",          c: "Pittsburgh, PA",    lat: 40.4468, lng: -80.0158 },
-  "San Francisco 49ers":   { v: "Levi's Stadium",            c: "Santa Clara, CA",   lat: 37.4030, lng: -121.9698 },
-  "Seattle Seahawks":      { v: "Lumen Field",               c: "Seattle, WA",       lat: 47.5952, lng: -122.3316 },
-  "Tampa Bay Buccaneers":  { v: "Raymond James Stadium",     c: "Tampa, FL",         lat: 27.9759, lng: -82.5033 },
-  "Tennessee Titans":      { v: "Nissan Stadium",            c: "Nashville, TN",     lat: 36.1665, lng: -86.7713 },
-  "Washington Commanders": { v: "Northwest Stadium",         c: "Landover, MD",      lat: 38.9077, lng: -76.8645 },
-  "Atlanta Hawks":            { v: "State Farm Arena",     c: "Atlanta, GA",        lat: 33.7573, lng: -84.3963 },
-  "Boston Celtics":           { v: "TD Garden",            c: "Boston, MA",         lat: 42.3662, lng: -71.0621 },
-  "Brooklyn Nets":            { v: "Barclays Center",      c: "Brooklyn, NY",       lat: 40.6826, lng: -73.9754 },
-  "Charlotte Hornets":        { v: "Spectrum Center",      c: "Charlotte, NC",      lat: 35.2251, lng: -80.8392 },
-  "Chicago Bulls":            { v: "United Center",        c: "Chicago, IL",        lat: 41.8806, lng: -87.6742 },
-  "Cleveland Cavaliers":      { v: "Rocket Mortgage FieldHouse", c: "Cleveland, OH", lat: 41.4964, lng: -81.6882 },
-  "Dallas Mavericks":         { v: "American Airlines Center", c: "Dallas, TX",     lat: 32.7905, lng: -96.8104 },
-  "Denver Nuggets":           { v: "Ball Arena",           c: "Denver, CO",         lat: 39.7487, lng: -105.0077 },
-  "Detroit Pistons":          { v: "Little Caesars Arena", c: "Detroit, MI",        lat: 42.3410, lng: -83.0553 },
-  "Golden State Warriors":    { v: "Chase Center",         c: "San Francisco, CA",  lat: 37.7680, lng: -122.3877 },
-  "Houston Rockets":          { v: "Toyota Center",        c: "Houston, TX",        lat: 29.7508, lng: -95.3621 },
-  "Indiana Pacers":           { v: "Gainbridge Fieldhouse", c: "Indianapolis, IN",  lat: 39.7640, lng: -86.1555 },
-  "LA Clippers":              { v: "Intuit Dome",          c: "Inglewood, CA",      lat: 33.9446, lng: -118.3414 },
-  "Los Angeles Lakers":       { v: "Crypto.com Arena",     c: "Los Angeles, CA",    lat: 34.0430, lng: -118.2673 },
-  "Memphis Grizzlies":        { v: "FedExForum",           c: "Memphis, TN",        lat: 35.1382, lng: -90.0506 },
-  "Miami Heat":               { v: "Kaseya Center",        c: "Miami, FL",          lat: 25.7814, lng: -80.1870 },
-  "Milwaukee Bucks":          { v: "Fiserv Forum",         c: "Milwaukee, WI",      lat: 43.0451, lng: -87.9173 },
-  "Minnesota Timberwolves":   { v: "Target Center",        c: "Minneapolis, MN",    lat: 44.9795, lng: -93.2762 },
-  "New Orleans Pelicans":     { v: "Smoothie King Center", c: "New Orleans, LA",    lat: 29.9490, lng: -90.0821 },
-  "New York Knicks":          { v: "Madison Square Garden", c: "New York, NY",      lat: 40.7505, lng: -73.9934 },
-  "Oklahoma City Thunder":    { v: "Paycom Center",        c: "Oklahoma City, OK",  lat: 35.4634, lng: -97.5151 },
-  "Orlando Magic":            { v: "Kia Center",           c: "Orlando, FL",        lat: 28.5392, lng: -81.3839 },
-  "Philadelphia 76ers":       { v: "Wells Fargo Center",   c: "Philadelphia, PA",   lat: 39.9012, lng: -75.1720 },
-  "Phoenix Suns":             { v: "Footprint Center",     c: "Phoenix, AZ",        lat: 33.4457, lng: -112.0712 },
-  "Portland Trail Blazers":   { v: "Moda Center",          c: "Portland, OR",       lat: 45.5316, lng: -122.6668 },
-  "Sacramento Kings":         { v: "Golden 1 Center",      c: "Sacramento, CA",     lat: 38.5802, lng: -121.4997 },
-  "San Antonio Spurs":        { v: "Frost Bank Center",    c: "San Antonio, TX",    lat: 29.4270, lng: -98.4375 },
-  "Toronto Raptors":          { v: "Scotiabank Arena",     c: "Toronto, ON",        lat: 43.6435, lng: -79.3791 },
-  "Utah Jazz":                { v: "Delta Center",         c: "Salt Lake City, UT", lat: 40.7683, lng: -111.9011 },
-  "Washington Wizards":       { v: "Capital One Arena",    c: "Washington, DC",     lat: 38.8981, lng: -77.0209 },
-  "Arizona Diamondbacks":   { v: "Chase Field",            c: "Phoenix, AZ",        lat: 33.4453, lng: -112.0667 },
-  "Atlanta Braves":         { v: "Truist Park",            c: "Cumberland, GA",     lat: 33.8909, lng: -84.4678 },
-  "Baltimore Orioles":      { v: "Oriole Park at Camden Yards", c: "Baltimore, MD", lat: 39.2838, lng: -76.6218 },
-  "Boston Red Sox":         { v: "Fenway Park",            c: "Boston, MA",         lat: 42.3467, lng: -71.0972 },
-  "Chicago Cubs":           { v: "Wrigley Field",          c: "Chicago, IL",        lat: 41.9484, lng: -87.6553 },
-  "Chicago White Sox":      { v: "Rate Field",             c: "Chicago, IL",        lat: 41.8299, lng: -87.6338 },
-  "Cincinnati Reds":        { v: "Great American Ball Park", c: "Cincinnati, OH",   lat: 39.0979, lng: -84.5082 },
-  "Cleveland Guardians":    { v: "Progressive Field",      c: "Cleveland, OH",      lat: 41.4962, lng: -81.6852 },
-  "Colorado Rockies":       { v: "Coors Field",            c: "Denver, CO",         lat: 39.7561, lng: -104.9942 },
-  "Detroit Tigers":         { v: "Comerica Park",          c: "Detroit, MI",        lat: 42.3390, lng: -83.0485 },
-  "Houston Astros":         { v: "Daikin Park",            c: "Houston, TX",        lat: 29.7572, lng: -95.3556 },
-  "Kansas City Royals":     { v: "Kauffman Stadium",       c: "Kansas City, MO",    lat: 39.0517, lng: -94.4803 },
-  "Los Angeles Angels":     { v: "Angel Stadium",          c: "Anaheim, CA",        lat: 33.8003, lng: -117.8827 },
-  "Los Angeles Dodgers":    { v: "Dodger Stadium",         c: "Los Angeles, CA",    lat: 34.0739, lng: -118.2400 },
-  "Miami Marlins":          { v: "loanDepot park",         c: "Miami, FL",          lat: 25.7782, lng: -80.2197 },
-  "Milwaukee Brewers":      { v: "American Family Field",  c: "Milwaukee, WI",      lat: 43.0280, lng: -87.9712 },
-  "Minnesota Twins":        { v: "Target Field",           c: "Minneapolis, MN",    lat: 44.9817, lng: -93.2776 },
-  "New York Mets":          { v: "Citi Field",             c: "New York, NY",       lat: 40.7571, lng: -73.8458 },
-  "New York Yankees":       { v: "Yankee Stadium",         c: "New York, NY",       lat: 40.8296, lng: -73.9262 },
-  "Athletics":              { v: "Sutter Health Park",     c: "Sacramento, CA",     lat: 38.5800, lng: -121.5128 },
-  "Philadelphia Phillies":  { v: "Citizens Bank Park",     c: "Philadelphia, PA",   lat: 39.9061, lng: -75.1665 },
-  "Pittsburgh Pirates":     { v: "PNC Park",               c: "Pittsburgh, PA",     lat: 40.4469, lng: -80.0057 },
-  "San Diego Padres":       { v: "Petco Park",             c: "San Diego, CA",      lat: 32.7073, lng: -117.1566 },
-  "San Francisco Giants":   { v: "Oracle Park",            c: "San Francisco, CA",  lat: 37.7786, lng: -122.3893 },
-  "Seattle Mariners":       { v: "T-Mobile Park",          c: "Seattle, WA",        lat: 47.5914, lng: -122.3325 },
-  "St. Louis Cardinals":    { v: "Busch Stadium",          c: "St. Louis, MO",      lat: 38.6226, lng: -90.1928 },
-  "Tampa Bay Rays":         { v: "George M. Steinbrenner Field", c: "Tampa, FL",    lat: 27.9803, lng: -82.5067 },
-  "Texas Rangers":          { v: "Globe Life Field",       c: "Arlington, TX",      lat: 32.7473, lng: -97.0814 },
-  "Toronto Blue Jays":      { v: "Rogers Centre",          c: "Toronto, ON",        lat: 43.6414, lng: -79.3894 },
-  "Washington Nationals":   { v: "Nationals Park",         c: "Washington, DC",     lat: 38.8729, lng: -77.0074 },
-  "Anaheim Ducks":           { v: "Honda Center",           c: "Anaheim, CA",       lat: 33.8078, lng: -117.8765 },
-  "Boston Bruins":           { v: "TD Garden",              c: "Boston, MA",        lat: 42.3662, lng: -71.0621 },
-  "Buffalo Sabres":          { v: "KeyBank Center",         c: "Buffalo, NY",       lat: 42.8751, lng: -78.8765 },
-  "Calgary Flames":          { v: "Scotiabank Saddledome",  c: "Calgary, AB",       lat: 51.0374, lng: -114.0519 },
-  "Carolina Hurricanes":     { v: "Lenovo Center",          c: "Raleigh, NC",       lat: 35.8033, lng: -78.7218 },
-  "Chicago Blackhawks":      { v: "United Center",          c: "Chicago, IL",       lat: 41.8806, lng: -87.6742 },
-  "Colorado Avalanche":      { v: "Ball Arena",             c: "Denver, CO",        lat: 39.7487, lng: -105.0077 },
-  "Columbus Blue Jackets":   { v: "Nationwide Arena",       c: "Columbus, OH",      lat: 39.9694, lng: -83.0061 },
-  "Dallas Stars":            { v: "American Airlines Center", c: "Dallas, TX",      lat: 32.7905, lng: -96.8104 },
-  "Detroit Red Wings":       { v: "Little Caesars Arena",   c: "Detroit, MI",       lat: 42.3410, lng: -83.0553 },
-  "Edmonton Oilers":         { v: "Rogers Place",           c: "Edmonton, AB",      lat: 53.5469, lng: -113.4974 },
-  "Florida Panthers":        { v: "Amerant Bank Arena",     c: "Sunrise, FL",       lat: 26.1585, lng: -80.3255 },
-  "Los Angeles Kings":       { v: "Crypto.com Arena",       c: "Los Angeles, CA",   lat: 34.0430, lng: -118.2673 },
-  "Minnesota Wild":          { v: "Grand Casino Arena",     c: "St. Paul, MN",      lat: 44.9447, lng: -93.1011 },
-  "Montreal Canadiens":      { v: "Bell Centre",            c: "Montreal, QC",      lat: 45.4961, lng: -73.5693 },
-  "Nashville Predators":     { v: "Bridgestone Arena",      c: "Nashville, TN",     lat: 36.1592, lng: -86.7785 },
-  "New Jersey Devils":       { v: "Prudential Center",      c: "Newark, NJ",        lat: 40.7336, lng: -74.1711 },
-  "New York Islanders":      { v: "UBS Arena",              c: "Elmont, NY",        lat: 40.7152, lng: -73.7261 },
-  "New York Rangers":        { v: "Madison Square Garden",  c: "New York, NY",      lat: 40.7505, lng: -73.9934 },
-  "Ottawa Senators":         { v: "Canadian Tire Centre",   c: "Ottawa, ON",        lat: 45.2969, lng: -75.9272 },
-  "Philadelphia Flyers":     { v: "Xfinity Mobile Arena",   c: "Philadelphia, PA",  lat: 39.9012, lng: -75.1720 },
-  "Pittsburgh Penguins":     { v: "PPG Paints Arena",       c: "Pittsburgh, PA",    lat: 40.4395, lng: -79.9893 },
-  "San Jose Sharks":         { v: "SAP Center",             c: "San Jose, CA",      lat: 37.3329, lng: -121.9012 },
-  "Seattle Kraken":          { v: "Climate Pledge Arena",   c: "Seattle, WA",       lat: 47.6221, lng: -122.3540 },
-  "St. Louis Blues":         { v: "Enterprise Center",      c: "St. Louis, MO",     lat: 38.6268, lng: -90.2026 },
-  "Tampa Bay Lightning":     { v: "Benchmark International Arena", c: "Tampa, FL",  lat: 27.9427, lng: -82.4519 },
-  "Toronto Maple Leafs":     { v: "Scotiabank Arena",       c: "Toronto, ON",       lat: 43.6435, lng: -79.3791 },
-  "Utah Mammoth":            { v: "Delta Center",           c: "Salt Lake City, UT", lat: 40.7683, lng: -111.9011 },
-  "Vancouver Canucks":       { v: "Rogers Arena",           c: "Vancouver, BC",     lat: 49.2778, lng: -123.1089 },
-  "Vegas Golden Knights":    { v: "T-Mobile Arena",         c: "Paradise, NV",      lat: 36.1029, lng: -115.1784 },
-  "Washington Capitals":     { v: "Capital One Arena",      c: "Washington, DC",    lat: 38.8981, lng: -77.0209 },
-  "Winnipeg Jets":           { v: "Canada Life Centre",     c: "Winnipeg, MB",      lat: 49.8929, lng: -97.1436 },
-  "Arsenal":            { v: "Emirates Stadium",    c: "London, UK",      lat: 51.5549, lng: -0.1084 },
-  "Chelsea":            { v: "Stamford Bridge",     c: "London, UK",      lat: 51.4816, lng: -0.1909 },
-  "Liverpool":          { v: "Anfield",             c: "Liverpool, UK",   lat: 53.4308, lng: -2.9608 },
-  "Manchester City":    { v: "Etihad Stadium",      c: "Manchester, UK",  lat: 53.4831, lng: -2.2004 },
-  "Manchester United":  { v: "Old Trafford",        c: "Manchester, UK",  lat: 53.4631, lng: -2.2913 },
-  "Tottenham":          { v: "Tottenham Hotspur Stadium", c: "London, UK", lat: 51.6043, lng: -0.0664 },
-  "Newcastle":          { v: "St James' Park",      c: "Newcastle, UK",   lat: 54.9756, lng: -1.6217 },
-  "Aston Villa":        { v: "Villa Park",          c: "Birmingham, UK",  lat: 52.5092, lng: -1.8847 },
-};
+// VENUES imported from ./venues
 
 const CITY_GUIDES = {
   "Nashville, TN": {
@@ -330,7 +204,7 @@ const LEAGUES = [
   { id: "nba", name: "NBA", emoji: "🏀", season: "Oct–Jun" },
   { id: "mlb", name: "MLB", emoji: "⚾", season: "Mar–Oct" },
   { id: "nhl", name: "NHL", emoji: "🏒", season: "Oct–Jun" },
-  
+  { id: "cfb", name: "CFB", emoji: "🏈", season: "Aug–Jan" },
 ];
 
 const TEAMS_BY_LEAGUE = {
@@ -338,7 +212,7 @@ const TEAMS_BY_LEAGUE = {
   nba: ["Atlanta Hawks","Boston Celtics","Brooklyn Nets","Charlotte Hornets","Chicago Bulls","Cleveland Cavaliers","Dallas Mavericks","Denver Nuggets","Detroit Pistons","Golden State Warriors","Houston Rockets","Indiana Pacers","LA Clippers","Los Angeles Lakers","Memphis Grizzlies","Miami Heat","Milwaukee Bucks","Minnesota Timberwolves","New Orleans Pelicans","New York Knicks","Oklahoma City Thunder","Orlando Magic","Philadelphia 76ers","Phoenix Suns","Portland Trail Blazers","Sacramento Kings","San Antonio Spurs","Toronto Raptors","Utah Jazz","Washington Wizards"],
   mlb: ["Arizona Diamondbacks","Atlanta Braves","Baltimore Orioles","Boston Red Sox","Chicago Cubs","Chicago White Sox","Cincinnati Reds","Cleveland Guardians","Colorado Rockies","Detroit Tigers","Houston Astros","Kansas City Royals","Los Angeles Angels","Los Angeles Dodgers","Miami Marlins","Milwaukee Brewers","Minnesota Twins","New York Mets","New York Yankees","Athletics","Philadelphia Phillies","Pittsburgh Pirates","San Diego Padres","San Francisco Giants","Seattle Mariners","St. Louis Cardinals","Tampa Bay Rays","Texas Rangers","Toronto Blue Jays","Washington Nationals"],
   nhl: ["Anaheim Ducks","Boston Bruins","Buffalo Sabres","Calgary Flames","Carolina Hurricanes","Chicago Blackhawks","Colorado Avalanche","Columbus Blue Jackets","Dallas Stars","Detroit Red Wings","Edmonton Oilers","Florida Panthers","Los Angeles Kings","Minnesota Wild","Montreal Canadiens","Nashville Predators","New Jersey Devils","New York Islanders","New York Rangers","Ottawa Senators","Philadelphia Flyers","Pittsburgh Penguins","San Jose Sharks","Seattle Kraken","St. Louis Blues","Tampa Bay Lightning","Toronto Maple Leafs","Utah Mammoth","Vancouver Canucks","Vegas Golden Knights","Washington Capitals","Winnipeg Jets"],
-  
+  cfb: ["Alabama Crimson Tide","Arkansas Razorbacks","Auburn Tigers","Florida Gators","Georgia Bulldogs","Kentucky Wildcats","LSU Tigers","Mississippi State Bulldogs","Missouri Tigers","Oklahoma Sooners","Ole Miss Rebels","South Carolina Gamecocks","Tennessee Volunteers","Texas Longhorns","Texas A&M Aggies","Vanderbilt Commodores","Illinois Fighting Illini","Indiana Hoosiers","Iowa Hawkeyes","Maryland Terrapins","Michigan Wolverines","Michigan State Spartans","Minnesota Golden Gophers","Nebraska Cornhuskers","Northwestern Wildcats","Ohio State Buckeyes","Penn State Nittany Lions","Purdue Boilermakers","Rutgers Scarlet Knights","Wisconsin Badgers","UCLA Bruins","USC Trojans","Oregon Ducks","Washington Huskies","Arizona Wildcats","Arizona State Sun Devils","Baylor Bears","BYU Cougars","Cincinnati Bearcats","Colorado Buffaloes","Houston Cougars","Iowa State Cyclones","Kansas Jayhawks","Kansas State Wildcats","Oklahoma State Cowboys","TCU Horned Frogs","Texas Tech Red Raiders","UCF Knights","Utah Utes","West Virginia Mountaineers","Boston College Eagles","Clemson Tigers","Duke Blue Devils","Florida State Seminoles","Georgia Tech Yellow Jackets","Louisville Cardinals","Miami Hurricanes","NC State Wolfpack","North Carolina Tar Heels","Notre Dame Fighting Irish","Pittsburgh Panthers","Syracuse Orange","Virginia Cavaliers","Virginia Tech Hokies","Wake Forest Demon Deacons","Stanford Cardinal","California Golden Bears"],
 };
 
 function generateSchedule(team, league) {
@@ -348,7 +222,7 @@ function generateSchedule(team, league) {
     nba:    { games: 25, startMonth: 4, startDay: 17, dayInterval: 3,   defaultTime: "19:30" },
     mlb:    { games: 25, startMonth: 4, startDay: 17, dayInterval: 2,   defaultTime: "19:05" },
     nhl:    { games: 22, startMonth: 4, startDay: 17, dayInterval: 3,   defaultTime: "19:00" },
-    
+    cfb:    { games: 7,  startMonth: 8, startDay: 1,  dayInterval: 7,   defaultTime: "12:00" },
   }[league];
   const games = [];
   let day = new Date(2026, meta.startMonth, meta.startDay);
@@ -452,8 +326,11 @@ export default function RoadGame() {
   const userLng = user?.lng ?? -82.5098;
   const userCity = user?.city ?? "Fletcher, NC";
   const [loading, setLoading] = useState(true);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [pendingProfile, setPendingProfile] = useState(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
-  const [view, setView] = useState("alerts");
+  const [view, setView] = useState("teams");
   const [activeLeague, setActiveLeague] = useState("nfl");
   const [search, setSearch] = useState("");
   const [following, setFollowing] = useState([]);
@@ -468,30 +345,62 @@ export default function RoadGame() {
   const [alertRadius, setAlertRadius] = useState(350);
 
   useEffect(() => {
-    async function loadSession() {
+    async function loadAuthedUser() {
       try {
-        const sessionRaw = await storage.get("session");
-        if (sessionRaw) {
-          const data = JSON.parse(sessionRaw);
-          setUser(data);
-          const profileRaw = await storage.get(`user:${data.email}`);
-          if (profileRaw) {
-            const p = JSON.parse(profileRaw);
-            setFollowing(p.following || []);
-            setAlertsEnabled(p.alertsEnabled ?? true);
-            setAlertRadius(p.alertRadius ?? 350);
+        const supaUser = await getCurrentUser();
+        if (supaUser) {
+          const profile = await getMyProfile(supaUser.id);
+          if (profile && profile.name && profile.city) {
+            setUser({ id: supaUser.id, email: supaUser.email, name: profile.name, city: profile.city, lat: profile.lat, lng: profile.lng });
+            setFollowing(profile.following || []);
+            setAlertsEnabled(profile.alerts_enabled ?? true);
+            setAlertRadius(profile.alert_radius ?? 350);
+          } else {
+            setPendingProfile({ id: supaUser.id, email: supaUser.email });
           }
         }
       } catch (e) {}
       setLoading(false);
     }
-    loadSession();
+    loadAuthedUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const supaUser = session.user;
+        const profile = await getMyProfile(supaUser.id);
+        if (profile && profile.name && profile.city) {
+          setUser({ id: supaUser.id, email: supaUser.email, name: profile.name, city: profile.city, lat: profile.lat, lng: profile.lng });
+          setFollowing(profile.following || []);
+          setAlertsEnabled(profile.alerts_enabled ?? true);
+          setAlertRadius(profile.alert_radius ?? 350);
+          setPendingProfile(null);
+        } else {
+          setPendingProfile({ id: supaUser.id, email: supaUser.email });
+        }
+        setLoading(false);
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setFollowing([]);
+        setPendingProfile(null);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    const profile = { ...user, following, alertsEnabled, alertRadius };
-    storage.set(`user:${user.email}`, JSON.stringify(profile)).catch(() => {});
+    upsertMyProfile({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      city: user.city,
+      lat: user.lat,
+      lng: user.lng,
+      following,
+      alerts_enabled: alertsEnabled,
+      alert_radius: alertRadius,
+    }).catch(() => {});
   }, [following, alertsEnabled, alertRadius, user]);
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2500); }
@@ -500,57 +409,11 @@ export default function RoadGame() {
     setAuthError(null);
     const email = authEmail.trim().toLowerCase();
     if (!email || !email.includes("@") || !email.includes(".")) { setAuthError("Enter a valid email address"); return; }
-    if (authMode === "signup" && !authName.trim()) { setAuthError("Enter your name"); return; }
-    if (authMode === "signup" && !authCity.trim()) { setAuthError("Enter your city or use 'Detect my location'"); return; }
-
     try {
-      if (authMode === "signup") {
-        const existing = await storage.get(`user:${email}`);
-        if (existing) { setAuthError("Account already exists — sign in instead"); return; }
-
-        // Resolve city name to coordinates
-        let location = null;
-        if (authCoords) {
-          location = { lat: authCoords.lat, lng: authCoords.lng, city: authCity.trim() };
-        } else {
-          const geo = await geocodeCity(authCity.trim());
-          if (!geo) { setAuthError(`Couldn't find "${authCity}". Try a major city nearby.`); return; }
-          location = { lat: geo.lat, lng: geo.lng, city: geo.name };
-        }
-
-        const newUser = {
-          email,
-          name: authName.trim(),
-          createdAt: new Date().toISOString(),
-          ...location,
-        };
-        const profile = { ...newUser, following: [], alertsEnabled: true, alertRadius: 350 };
-        const saved = await storage.set(`user:${email}`, JSON.stringify(profile));
-        if (!saved) { setAuthError("Couldn't save account — storage unavailable"); return; }
-        await storage.set("session", JSON.stringify(newUser));
-        setUser(newUser);
-        showToast(`Welcome to RoadGame, ${authName.trim().split(" ")[0]}!`);
-      } else {
-        const existing = await storage.get(`user:${email}`);
-        if (!existing) { setAuthError("No account found — sign up first"); return; }
-        const p = JSON.parse(existing);
-        const session = {
-          email: p.email || email,
-          name: p.name || "Fan",
-          lat: p.lat,
-          lng: p.lng,
-          city: p.city,
-        };
-        await storage.set("session", JSON.stringify(session));
-        setUser(session);
-        setFollowing(p.following || []);
-        setAlertsEnabled(p.alertsEnabled ?? true);
-        setAlertRadius(p.alertRadius ?? 350);
-        showToast(`Welcome back, ${session.name.split(" ")[0]}!`);
-      }
-      setAuthEmail(""); setAuthName(""); setAuthCity(""); setAuthCoords(null);
+      await sendMagicLink(email);
+      setMagicLinkSent(true);
     } catch (e) {
-      setAuthError(`Error: ${e.message || "Something went wrong"}`);
+      setAuthError(`Couldn't send magic link: ${e.message || "Please try again"}`);
     }
   }
 async function saveNewLocation() {
@@ -567,14 +430,15 @@ async function saveNewLocation() {
 
     const updatedUser = { ...user, ...location };
     setUser(updatedUser);
-    await storage.set("session", JSON.stringify(updatedUser));
-
-    // Also update the stored profile so future logins remember
-    const profileRaw = await storage.get(`user:${user.email}`);
-    if (profileRaw) {
-      const profile = JSON.parse(profileRaw);
-      await storage.set(`user:${user.email}`, JSON.stringify({ ...profile, ...location }));
-    }
+    await upsertMyProfile({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      ...location,
+      following,
+      alerts_enabled: alertsEnabled,
+      alert_radius: alertRadius,
+    }).catch(() => {});
 
     setEditingLocation(false);
     setNewCity("");
@@ -623,12 +487,49 @@ async function saveNewLocation() {
     );
   }
 
+  async function completeProfile() {
+    setAuthError(null);
+    if (!authName.trim()) { setAuthError("Enter your name"); return; }
+    if (!authCity.trim() && !authCoords) { setAuthError("Enter your city or use 'Detect my location'"); return; }
+
+    let location = null;
+    if (authCoords) {
+      location = { lat: authCoords.lat, lng: authCoords.lng, city: authCity.trim() };
+    } else {
+      const geo = await geocodeCity(authCity.trim());
+      if (!geo) { setAuthError(`Couldn't find "${authCity}". Try a major city nearby.`); return; }
+      location = { lat: geo.lat, lng: geo.lng, city: geo.name };
+    }
+
+    try {
+      await upsertMyProfile({
+        id: pendingProfile.id,
+        email: pendingProfile.email,
+        name: authName.trim(),
+        ...location,
+        following: [],
+        alerts_enabled: true,
+        alert_radius: 350,
+      });
+      setUser({ id: pendingProfile.id, email: pendingProfile.email, name: authName.trim(), ...location });
+      setFollowing([]);
+      setAlertsEnabled(true);
+      setAlertRadius(350);
+      setPendingProfile(null);
+      setAuthName(""); setAuthCity(""); setAuthCoords(null);
+      showToast(`Welcome to RoadGame, ${authName.trim().split(" ")[0]}!`);
+    } catch (e) {
+      setAuthError(`Error saving profile: ${e.message || "Please try again"}`);
+    }
+  }
+
   async function signOut() {
-    await storage.delete("session");
-    setUser(null); setFollowing([]); setActiveTeam(null); setView("alerts");
+    await signOutSupabase();
+    setUser(null); setFollowing([]); setActiveTeam(null); setView("teams");
   }
 
   function toggleFollow(team, league) {
+    if (!user) { setAuthOpen(true); return; }
     const exists = following.find(f => f.team === team && f.league === league);
     if (exists) { setFollowing(following.filter(f => !(f.team === team && f.league === league))); showToast(`Unfollowed ${team}`); }
     else { setFollowing([...following, { team, league }]); showToast(`Following ${team}`); }
@@ -643,18 +544,24 @@ async function saveNewLocation() {
 
 const [schedule, setSchedule] = useState([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState(false); // true = API failed, false = loaded ok
 
   useEffect(() => {
     let cancelled = false;
     async function loadSchedule() {
-      if (!activeTeam) { setSchedule([]); return; }
+      if (!activeTeam) { setSchedule([]); setScheduleError(false); return; }
       setScheduleLoading(true);
+      setScheduleError(false);
 
       const realGames = await fetchTeamSchedule(activeTeam.team, activeTeam.league);
 
       if (cancelled) return;
 
-      if (realGames && realGames.length > 0) {
+      if (realGames === null) {
+        // API failure or key not configured — don't claim the season is over
+        setSchedule([]);
+        setScheduleError(true);
+      } else if (realGames.length > 0) {
         const enriched = realGames.map(g => ({
           ...g,
           dist: haversine(userLat, userLng, g.lat, g.lng),
@@ -662,7 +569,7 @@ const [schedule, setSchedule] = useState([]);
         }));
         setSchedule(enriched);
       } else {
-        // No real games available — show empty state instead of demo data
+        // API responded successfully but genuinely no upcoming games
         setSchedule([]);
       }
       setScheduleLoading(false);
@@ -697,8 +604,8 @@ const [schedule, setSchedule] = useState([]);
     );
   }
 
-  // ─────────────── AUTH SCREEN ────────────────
-  if (!user) {
+  // ─────────────── COMPLETE PROFILE ────────────────
+  if (pendingProfile) {
     return (
       <div style={{
         minHeight: "100vh",
@@ -721,17 +628,15 @@ const [schedule, setSchedule] = useState([]);
           .ticket-stub::after { right: -8px; }
         `}</style>
         <div style={{ width: "100%", maxWidth: 380 }}>
-          {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
               <LogoMark size={140} />
             </div>
             <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 14, letterSpacing: 2, textTransform: "uppercase", fontWeight: 500 }}>
-              Follow Your Team · Plan The Trip
+              One last step
             </div>
           </div>
 
-          {/* Ticket-shaped auth card */}
           <div className="ticket-stub" style={{
             background: BRAND.cream,
             borderRadius: 12,
@@ -739,67 +644,46 @@ const [schedule, setSchedule] = useState([]);
             color: BRAND.charcoal,
             boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
           }}>
-            <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(45,58,66,0.08)", borderRadius: 8, padding: 3 }}>
-              {[["signin","SIGN IN"],["signup","SIGN UP"]].map(([m, lbl]) => (
-                <button key={m} onClick={() => { setAuthMode(m); setAuthError(null); }} style={{
-                  flex: 1, padding: "9px", borderRadius: 6, border: "none", cursor: "pointer",
-                  background: authMode === m ? BRAND.slate : "transparent",
-                  color: authMode === m ? BRAND.cream : BRAND.muted,
-                  fontSize: 11, fontWeight: 700, letterSpacing: 1,
-                  fontFamily: "'Oswald', sans-serif",
-                }}>{lbl}</button>
-              ))}
+            <div className="oswald" style={{ fontSize: 18, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, color: BRAND.charcoal }}>
+              COMPLETE YOUR PROFILE
+            </div>
+            <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 20, fontWeight: 500 }}>
+              Signed in as <strong>{pendingProfile.email}</strong>
             </div>
 
-            {authMode === "signup" && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Name</label>
-                <input type="text" value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Your name"
-                  style={{
-                    width: "100%", padding: "11px 13px", borderRadius: 8,
-                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
-                    color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
-                    fontFamily: "'Inter', sans-serif",
-                  }} />
-              </div>
-            )}
-{authMode === "signup" && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>
-                  Your City
-                </label>
-                <input type="text" value={authCity}
-                  onChange={e => { setAuthCity(e.target.value); setAuthCoords(null); }}
-                  placeholder="Charlotte, NC"
-                  style={{
-                    width: "100%", padding: "11px 13px", borderRadius: 8,
-                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
-                    color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
-                    fontFamily: "'Inter', sans-serif",
-                    marginBottom: 6,
-                  }} />
-                <button type="button" onClick={detectLocation} disabled={detectingLocation}
-                  className="oswald"
-                  style={{
-                    background: "transparent", color: BRAND.greenDark,
-                    border: `1px solid ${BRAND.greenDark}`, borderRadius: 7,
-                    padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1,
-                    cursor: "pointer", width: "100%",
-                  }}>
-                  {detectingLocation ? "DETECTING..." : "📍 USE MY CURRENT LOCATION"}
-                </button>
-              </div>
-            )}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
-              <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com"
-                onKeyDown={e => e.key === "Enter" && handleAuth()}
+              <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Your Name</label>
+              <input type="text" value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Your name"
                 style={{
                   width: "100%", padding: "11px 13px", borderRadius: 8,
                   background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
                   color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
                   fontFamily: "'Inter', sans-serif",
                 }} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 10, color: BRAND.muted, marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Your City</label>
+              <input type="text" value={authCity}
+                onChange={e => { setAuthCity(e.target.value); setAuthCoords(null); }}
+                placeholder="Charlotte, NC"
+                style={{
+                  width: "100%", padding: "11px 13px", borderRadius: 8,
+                  background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                  color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
+                  fontFamily: "'Inter', sans-serif",
+                  marginBottom: 6,
+                }} />
+              <button type="button" onClick={detectLocation} disabled={detectingLocation}
+                className="oswald"
+                style={{
+                  background: "transparent", color: BRAND.greenDark,
+                  border: `1px solid ${BRAND.greenDark}`, borderRadius: 7,
+                  padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                  cursor: "pointer", width: "100%",
+                }}>
+                {detectingLocation ? "DETECTING..." : "📍 USE MY CURRENT LOCATION"}
+              </button>
             </div>
 
             {authError && (
@@ -809,7 +693,7 @@ const [schedule, setSchedule] = useState([]);
               }}>{authError}</div>
             )}
 
-            <button onClick={handleAuth} style={{
+            <button onClick={completeProfile} style={{
               width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
               background: BRAND.green, color: BRAND.charcoal,
               fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
@@ -819,9 +703,8 @@ const [schedule, setSchedule] = useState([]);
             }}
             onMouseDown={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 2px 0 ${BRAND.greenDark}`; }}
             onMouseUp={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 0 ${BRAND.greenDark}`; }}
-            >{authMode === "signup" ? "CREATE ACCOUNT" : "SIGN IN"} →</button>
+            >LET'S GO →</button>
 
-            {/* Ticket barcode strip */}
             <div style={{ marginTop: 18, display: "flex", justifyContent: "center", gap: 1.5, opacity: 0.4 }}>
               {[3,1,2,4,1,3,2,1,4,2,3,1,2,1,3,4,1,2,3,1,4,2,1,3].map((w, i) => (
                 <div key={i} style={{ width: w, height: 24, background: BRAND.charcoal }} />
@@ -863,6 +746,100 @@ const [schedule, setSchedule] = useState([]);
         }}>{toast}</div>
       )}
 
+      {/* Auth Modal */}
+      {authOpen && !user && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.78)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20,
+        }} onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 360,
+            background: BRAND.cream, borderRadius: 12,
+            padding: "28px 24px",
+            color: BRAND.charcoal,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            position: "relative",
+          }}>
+            <button onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }} style={{
+              position: "absolute", top: 12, right: 12,
+              background: "transparent", border: "none", cursor: "pointer",
+              fontSize: 18, color: BRAND.muted, lineHeight: 1, padding: 4,
+            }}>✕</button>
+
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <LogoMark size={80} />
+            </div>
+
+            {!magicLinkSent ? (
+              <>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, color: BRAND.charcoal }}>
+                  SIGN IN
+                </div>
+                <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 18, fontWeight: 500 }}>
+                  No password needed — we'll email you a magic link.
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "block", fontSize: 10, color: "#7A8890", marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleAuth()}
+                    placeholder="you@example.com"
+                    style={{
+                      width: "100%", padding: "11px 13px", borderRadius: 8,
+                      background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                      color: BRAND.charcoal, fontSize: 14, outline: "none", fontWeight: 500,
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  />
+                </div>
+                {authError && (
+                  <div style={{
+                    background: "rgba(232,69,69,0.08)", border: `1.5px solid ${BRAND.red}`,
+                    color: BRAND.red, borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 12, fontWeight: 600,
+                  }}>{authError}</div>
+                )}
+                <button onClick={handleAuth} style={{
+                  width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: BRAND.green, color: BRAND.charcoal,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
+                  fontFamily: "'Oswald', sans-serif",
+                  boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+                }}>SEND MAGIC LINK →</button>
+              </>
+            ) : (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: BRAND.charcoal, marginBottom: 8 }}>
+                  CHECK YOUR EMAIL
+                </div>
+                <div style={{ fontSize: 13, color: "#5A6770", fontWeight: 500, lineHeight: 1.5, marginBottom: 18 }}>
+                  We sent a magic link to <strong>{authEmail}</strong>.<br />
+                  Click it to sign in — no password needed.
+                </div>
+                <button onClick={() => { setMagicLinkSent(false); setAuthEmail(""); setAuthError(null); }} style={{
+                  background: "transparent", border: `1.5px solid #9BA8B0`, borderRadius: 7,
+                  padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#5A6770",
+                  cursor: "pointer", fontFamily: "'Oswald', sans-serif", letterSpacing: 1,
+                }}>← USE DIFFERENT EMAIL</button>
+              </div>
+            )}
+
+            <div style={{ marginTop: 18, display: "flex", justifyContent: "center", gap: 1.5, opacity: 0.2 }}>
+              {[3,1,2,4,1,3,2,1,4,2,3,1,2,1,3,4,1,2,3,1,4,2,1,3].map((w, i) => (
+                <div key={i} style={{ width: w, height: 20, background: BRAND.charcoal }} />
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "#9BA8B0", textAlign: "center", marginTop: 10, letterSpacing: 1, fontWeight: 600 }}>
+              ADMIT ONE · NO PASSWORD REQUIRED
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         background: BRAND.slateDark,
@@ -884,12 +861,20 @@ const [schedule, setSchedule] = useState([]);
               fontFamily: "'Oswald', sans-serif",
             }}>● {weekAlerts.length} THIS WEEK</div>
           )}
-          <button onClick={() => setView("profile")} style={{
-            width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
-            background: view === "profile" ? BRAND.green : BRAND.slateLight,
-            color: view === "profile" ? BRAND.charcoal : BRAND.cream,
-            fontSize: 13, fontWeight: 800,
-          }}>{user.name[0].toUpperCase()}</button>
+          {user ? (
+            <button onClick={() => setView("profile")} style={{
+              width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
+              background: view === "profile" ? BRAND.green : BRAND.slateLight,
+              color: view === "profile" ? BRAND.charcoal : BRAND.cream,
+              fontSize: 13, fontWeight: 800,
+            }}>{user.name[0].toUpperCase()}</button>
+          ) : (
+            <button onClick={() => setAuthOpen(true)} className="oswald" style={{
+              padding: "5px 13px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: BRAND.green, color: BRAND.charcoal,
+              fontSize: 11, fontWeight: 700, letterSpacing: 1,
+            }}>SIGN IN</button>
+          )}
         </div>
       </div>
 
@@ -912,7 +897,7 @@ const [schedule, setSchedule] = useState([]);
       )}
 
       {/* ── PROFILE ── */}
-      {view === "profile" && (
+      {view === "profile" && user && (
         <div style={{ padding: "16px 14px", maxWidth: 500, margin: "0 auto" }}>
           <button onClick={() => setView("alerts")} className="oswald" style={{
             background: BRAND.slateLight, border: "none",
@@ -1048,7 +1033,7 @@ const [schedule, setSchedule] = useState([]);
         <div style={{ padding: "16px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div style={{ marginBottom: 14 }}>
             <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
-              HEY, {user.name.split(" ")[0].toUpperCase()}.
+              HEY{user ? `, ${user.name.split(" ")[0].toUpperCase()}` : ""}.
             </div>
             <div style={{ fontSize: 12, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>
               {weekAlerts.length > 0
@@ -1270,7 +1255,29 @@ const [schedule, setSchedule] = useState([]);
             </div>
           )}
 
-          {!scheduleLoading && schedule.length === 0 && (
+          {!scheduleLoading && schedule.length === 0 && scheduleError && (
+            <div style={{
+              background: BRAND.slateLight,
+              border: `1.5px solid rgba(245,239,226,0.1)`,
+              borderRadius: 12,
+              padding: "32px 20px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📡</div>
+              <div className="oswald" style={{
+                fontSize: 16, color: BRAND.cream, letterSpacing: 0.5,
+                fontWeight: 700, marginBottom: 6,
+              }}>SCHEDULE UNAVAILABLE</div>
+              <div style={{
+                fontSize: 13, color: BRAND.muted, fontWeight: 500, lineHeight: 1.5,
+                maxWidth: 280, margin: "0 auto",
+              }}>
+                Couldn't load the schedule right now. Check back in a moment.
+              </div>
+            </div>
+          )}
+
+          {!scheduleLoading && schedule.length === 0 && !scheduleError && (
             <div style={{
               background: BRAND.slateLight,
               border: `2px dashed ${BRAND.green}`,
@@ -1287,8 +1294,8 @@ const [schedule, setSchedule] = useState([]);
                 fontSize: 13, color: BRAND.muted, fontWeight: 500, lineHeight: 1.5,
                 maxWidth: 280, margin: "0 auto",
               }}>
-                {activeTeam.team} doesn't have any upcoming games right now.
-                Check back when their next season kicks off.
+                {activeTeam.team} doesn't have any upcoming games posted yet.
+                Check back when their next season schedule drops.
               </div>
               <div className="oswald" style={{
                 marginTop: 14, fontSize: 10, color: BRAND.green,
@@ -1332,7 +1339,7 @@ const [schedule, setSchedule] = useState([]);
                     <div style={{ flexShrink: 0, textAlign: "right" }}>
                       <div className="oswald" style={{ background: tier.bg, color: tier.color, borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{tier.label}</div>
                       <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{game.dist} mi</div>
-                      <div className="oswald" style={{ fontSize: 14, fontWeight: 700, color: BRAND.green, letterSpacing: 0.3 }}>${game.ticketsFrom}+</div>
+                      {game.ticketsFrom != null && <div className="oswald" style={{ fontSize: 14, fontWeight: 700, color: BRAND.green, letterSpacing: 0.3 }}>${game.ticketsFrom}+</div>}
                     </div>
                   </div>
                 </div>
@@ -1449,26 +1456,49 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
       </div>
 
       {travelTab === "tickets" && (() => {
+        const teamQ = encodeURIComponent(activeTeam.team);
+        // SeatGeek uses hash-based routing for search, so use the stable performer page URL instead
+        const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const sgUrl = `https://seatgeek.com/${sgSlug}-tickets${SEATGEEK_CLIENT_ID ? `?client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
         const vendors = [
-          { name: "Ticketmaster", desc: "Official primary", price: game.ticketsFrom, color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${query}` },
-          { name: "StubHub", desc: "Resale guarantee", price: Math.round(game.ticketsFrom * 0.92), color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${query}` },
-          { name: "SeatGeek", desc: "Deal Score rated", price: Math.round(game.ticketsFrom * 1.05), color: "#FF5B49", url: `https://seatgeek.com/search?search=${query}` },
-          { name: "Vivid Seats", desc: "Rewards", price: Math.round(game.ticketsFrom * 0.98), color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${query}` },
+          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49", url: sgUrl, highlight: !!SEATGEEK_CLIENT_ID },
+          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${teamQ}` },
+          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${teamQ}` },
+          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${teamQ}` },
         ];
-        const cheap = Math.min(...vendors.map(v => v.price));
+        const [sg, ...rest] = vendors;
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ background: BRAND.green, color: BRAND.charcoal, borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5 }}>BEST PRICE</div>
-                <div style={{ fontSize: 11, fontWeight: 600 }}>{matchup}</div>
-              </div>
-              <div className="oswald" style={{ fontSize: 22, fontWeight: 700 }}>${cheap}+</div>
+            <div style={{ background: BRAND.slateLight, borderRadius: 8, padding: "8px 12px", marginBottom: 2 }}>
+              <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: BRAND.green }}>FIND TICKETS · {matchup.toUpperCase()}</div>
+              <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>Compare prices across all major sellers</div>
             </div>
-            {vendors.map(v => (
+
+            {/* SeatGeek — featured card */}
+            <a href={sg.url} target="_blank" rel="noopener noreferrer" style={{
+              background: "rgba(124,194,66,0.10)",
+              border: `2px solid ${BRAND.green}`,
+              borderRadius: 10, padding: "14px 14px", textDecoration: "none",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="oswald" style={{ width: 36, height: 36, borderRadius: 8, background: sg.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>S</div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream }}>{sg.name}</div>
+                    <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, background: BRAND.green, color: BRAND.charcoal, borderRadius: 4, padding: "2px 6px" }}>BEST PICK</div>
+                  </div>
+                  <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>Deal Score rated · Best prices guaranteed</div>
+                </div>
+              </div>
+              <div className="oswald" style={{ fontSize: 12, color: BRAND.green, fontWeight: 700, letterSpacing: 1, whiteSpace: "nowrap" }}>GET TICKETS →</div>
+            </a>
+
+            {/* Other vendors */}
+            {rest.map(v => (
               <a key={v.name} href={v.url} target="_blank" rel="noopener noreferrer" style={{
                 background: BRAND.slateLight,
-                border: v.price === cheap ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                border: `1px solid rgba(245,239,226,0.06)`,
                 borderRadius: 8, padding: "10px 12px", textDecoration: "none",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
@@ -1481,10 +1511,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
                     <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{v.desc}</div>
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="oswald" style={{ fontSize: 15, fontWeight: 700, color: v.price === cheap ? BRAND.green : BRAND.cream }}>${v.price}+</div>
-                  <div className="oswald" style={{ fontSize: 9, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>BUY →</div>
-                </div>
+                <div className="oswald" style={{ fontSize: 11, color: BRAND.muted, fontWeight: 700, letterSpacing: 1 }}>GET TICKETS →</div>
               </a>
             ))}
           </div>
@@ -1544,22 +1571,37 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
 
       {travelTab === "hotels" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {["Marriott", "Hyatt Place", "Hilton Garden Inn"].map((brand, i) => {
-            const price = Math.round(110 + game.dist * 0.04 + i * 25);
+          <div style={{ background: BRAND.slateLight, borderRadius: 8, padding: "8px 12px", marginBottom: 2 }}>
+            <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: BRAND.green }}>HOTELS NEAR {game.city.split(",")[0].toUpperCase()}</div>
+            <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>Book via Expedia for best rates</div>
+          </div>
+          {["Hotels Near Venue", "Downtown Hotels", "Airport Hotels"].map((label, i) => {
+            const expediaBase = EXPEDIA_CREATOR_ID
+              ? `https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&affcid=${EXPEDIA_CREATOR_ID}`
+              : `https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}`;
+            const searches = [
+              encodeURIComponent(`hotels near ${game.venue}`),
+              encodeURIComponent(`downtown ${game.city.split(",")[0]} hotel`),
+              encodeURIComponent(`airport hotel ${game.city.split(",")[0]}`),
+            ];
             return (
-              <a key={i} href={`https://www.google.com/travel/hotels/search?q=${encodeURIComponent(brand + " " + game.city)}`}
+              <a key={i} href={`${expediaBase}&term=${searches[i]}`}
                 target="_blank" rel="noopener noreferrer" style={{
-                background: BRAND.slateLight, borderRadius: 8, padding: "9px 12px", textDecoration: "none",
+                background: BRAND.slateLight,
+                border: i === 0 ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                borderRadius: 8, padding: "10px 12px", textDecoration: "none",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{brand} {game.city.split(",")[0]}</div>
-                  <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{"★".repeat(4 - i)} · {(i + 3) * 0.3}mi from venue</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="oswald" style={{ width: 30, height: 30, borderRadius: 6, background: "#003580", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>
+                    E
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{label}</div>
+                    <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>Expedia · Compare rates</div>
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="oswald" style={{ fontSize: 14, fontWeight: 700, color: BRAND.green }}>${price}</div>
-                  <div className="oswald" style={{ fontSize: 9, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>BOOK →</div>
-                </div>
+                <div className="oswald" style={{ fontSize: 11, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>SEARCH →</div>
               </a>
             );
           })}
