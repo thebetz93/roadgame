@@ -321,10 +321,13 @@ export default function RoadGame() {
   const [editingLocation, setEditingLocation] = useState(false);
   const [newCity, setNewCity] = useState("");
   const [newCoords, setNewCoords] = useState(null);
-  // Location is per-user. Default to Fletcher, NC only as a fallback if profile has none.
-  const userLat = user?.lat ?? 35.4443;
-  const userLng = user?.lng ?? -82.5098;
-  const userCity = user?.city ?? "Fletcher, NC";
+  const [guestLoc, setGuestLoc] = useState({ city: '', lat: null, lng: null });
+  const [locPickerOpen, setLocPickerOpen] = useState(false);
+  const [locInput, setLocInput] = useState('');
+  const [locDetecting, setLocDetecting] = useState(false);
+  const userLat = user?.lat ?? guestLoc.lat ?? 35.4443;
+  const userLng = user?.lng ?? guestLoc.lng ?? -82.5098;
+  const userCity = user?.city || guestLoc.city || '';
   const [loading, setLoading] = useState(true);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [pendingProfile, setPendingProfile] = useState(null);
@@ -345,6 +348,14 @@ export default function RoadGame() {
   const [alertRadius, setAlertRadius] = useState(350);
 
   useEffect(() => {
+    const hasMagicToken = typeof window !== 'undefined' && window.location.hash.includes('access_token');
+    const magicTimeout = hasMagicToken ? setTimeout(() => setLoading(false), 8000) : null;
+
+    try {
+      const saved = localStorage.getItem('roadgame:guestLoc');
+      if (saved) setGuestLoc(JSON.parse(saved));
+    } catch {}
+
     async function loadAuthedUser() {
       try {
         const supaUser = await getCurrentUser();
@@ -360,12 +371,13 @@ export default function RoadGame() {
           }
         }
       } catch (e) {}
-      setLoading(false);
+      if (!hasMagicToken) setLoading(false);
     }
     loadAuthedUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
+        clearTimeout(magicTimeout);
         const supaUser = session.user;
         const profile = await getMyProfile(supaUser.id);
         if (profile && profile.name && profile.city) {
@@ -380,12 +392,14 @@ export default function RoadGame() {
         setLoading(false);
       }
       if (event === 'SIGNED_OUT') {
+        clearTimeout(magicTimeout);
         setUser(null);
         setFollowing([]);
         setPendingProfile(null);
+        setLoading(false);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearTimeout(magicTimeout); };
   }, []);
 
   useEffect(() => {
@@ -413,7 +427,12 @@ export default function RoadGame() {
       await sendMagicLink(email);
       setMagicLinkSent(true);
     } catch (e) {
-      setAuthError(`Couldn't send magic link: ${e.message || "Please try again"}`);
+      const msg = e.message || '';
+      if (msg.toLowerCase().includes('security') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('after')) {
+        setAuthError("Too many attempts. Please wait a few minutes, then try again.");
+      } else {
+        setAuthError(msg || "Couldn't send magic link. Please try again.");
+      }
     }
   }
 async function saveNewLocation() {
@@ -464,6 +483,49 @@ async function saveNewLocation() {
       { timeout: 10000 }
     );
   }
+
+  async function saveLocPicker() {
+    const city = locInput.trim();
+    if (!city) { showToast("Enter a city first"); return; }
+    const geo = await geocodeCity(city);
+    if (!geo) { showToast(`Couldn't find "${city}". Try a major city nearby.`); return; }
+    if (user) {
+      const updatedUser = { ...user, city: geo.name, lat: geo.lat, lng: geo.lng };
+      setUser(updatedUser);
+      await upsertMyProfile({ id: user.id, email: user.email, name: user.name, city: geo.name, lat: geo.lat, lng: geo.lng, following, alerts_enabled: alertsEnabled, alert_radius: alertRadius }).catch(() => {});
+    } else {
+      const loc = { city: geo.name, lat: geo.lat, lng: geo.lng };
+      setGuestLoc(loc);
+      try { localStorage.setItem('roadgame:guestLoc', JSON.stringify(loc)); } catch {}
+    }
+    setLocPickerOpen(false);
+    setLocInput('');
+    showToast(`Location set to ${geo.name}`);
+  }
+
+  async function detectLocPicker() {
+    if (!navigator.geolocation) { showToast("Geolocation not supported by your browser"); return; }
+    setLocDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const { latitude, longitude } = pos.coords;
+        const cityName = await reverseGeocode(latitude, longitude);
+        setLocInput(cityName || '');
+        setLocDetecting(false);
+        if (!user && cityName) {
+          const loc = { city: cityName, lat: latitude, lng: longitude };
+          setGuestLoc(loc);
+          try { localStorage.setItem('roadgame:guestLoc', JSON.stringify(loc)); } catch {}
+          setLocPickerOpen(false);
+          setLocInput('');
+          showToast(`Location set to ${cityName}`);
+        }
+      },
+      () => { setLocDetecting(false); showToast("Location permission denied. Type your city manually."); },
+      { timeout: 10000 }
+    );
+  }
+
   async function detectLocation() {
     setAuthError(null);
     if (!navigator.geolocation) {
@@ -597,9 +659,10 @@ const [schedule, setSchedule] = useState([]);
 
   // ─────────────── LOADING ────────────────
   if (loading) {
+    const isVerifying = typeof window !== 'undefined' && window.location.hash.includes('access_token');
     return (
       <div style={{ minHeight: "100vh", background: BRAND.slate, display: "flex", alignItems: "center", justifyContent: "center", color: BRAND.muted, fontFamily: "'Oswald', sans-serif", letterSpacing: 2 }}>
-        LOADING ROADGAME...
+        {isVerifying ? 'SIGNING YOU IN...' : 'LOADING ROADGAME...'}
       </div>
     );
   }
@@ -746,6 +809,54 @@ const [schedule, setSchedule] = useState([]);
         }}>{toast}</div>
       )}
 
+      {/* Location Picker Modal */}
+      {locPickerOpen && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.65)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20,
+        }} onClick={() => setLocPickerOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 320,
+            background: BRAND.slateDark, borderRadius: 12,
+            padding: "22px 20px",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            border: `1px solid rgba(255,255,255,0.08)`,
+          }}>
+            <div className="oswald" style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream, marginBottom: 14, letterSpacing: 0.5 }}>
+              YOUR LOCATION
+            </div>
+            <input
+              type="text"
+              value={locInput}
+              onChange={e => setLocInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && saveLocPicker()}
+              placeholder="City, State"
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 8, marginBottom: 8,
+                background: BRAND.slate, border: `1.5px solid rgba(255,255,255,0.12)`,
+                color: BRAND.cream, fontSize: 14, outline: "none",
+                fontFamily: "'Inter', sans-serif",
+              }}
+            />
+            <button onClick={detectLocPicker} style={{
+              width: "100%", padding: "9px", borderRadius: 8, border: `1.5px solid rgba(255,255,255,0.15)`,
+              background: "transparent", color: BRAND.muted,
+              fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: "pointer",
+              fontFamily: "'Oswald', sans-serif", marginBottom: 8,
+            }}>{locDetecting ? "DETECTING..." : "📍 USE MY LOCATION"}</button>
+            <button onClick={saveLocPicker} style={{
+              width: "100%", padding: "11px", borderRadius: 8, border: "none",
+              background: BRAND.green, color: BRAND.charcoal,
+              fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer",
+              fontFamily: "'Oswald', sans-serif",
+              boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+            }}>SAVE LOCATION →</button>
+          </div>
+        </div>
+      )}
+
       {/* Auth Modal */}
       {authOpen && !user && (
         <div style={{
@@ -849,9 +960,19 @@ const [schedule, setSchedule] = useState([]);
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <LogoMark size={36} />
-          <div style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
-            {userCity}
-          </div>
+          <button onClick={() => { setLocInput(userCity); setLocPickerOpen(true); }} style={{
+            background: "transparent", border: "none", cursor: "pointer", padding: 0,
+          }}>
+            {userCity ? (
+              <div style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
+                {userCity}
+              </div>
+            ) : (
+              <div style={{ fontSize: 9, color: BRAND.green, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
+                📍 SET LOCATION
+              </div>
+            )}
+          </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           {weekAlerts.length > 0 && (
