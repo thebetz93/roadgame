@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
-import { sendMagicLink, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
+import { sendOtpCode, verifyEmailOtp, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
 
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
 // SeatGeek: go to developer.seatgeek.com → Authentication → copy your client_id
@@ -329,7 +329,8 @@ export default function RoadGame() {
   const userLng = user?.lng ?? guestLoc.lng ?? -82.5098;
   const userCity = user?.city || guestLoc.city || '';
   const [loading, setLoading] = useState(true);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [pendingProfile, setPendingProfile] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -424,14 +425,37 @@ export default function RoadGame() {
     const email = authEmail.trim().toLowerCase();
     if (!email || !email.includes("@") || !email.includes(".")) { setAuthError("Enter a valid email address"); return; }
     try {
-      await sendMagicLink(email);
-      setMagicLinkSent(true);
+      await sendOtpCode(email);
+      setOtpSent(true);
+      setOtpCode('');
     } catch (e) {
       const msg = e.message || '';
       if (msg.toLowerCase().includes('security') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('after')) {
         setAuthError("Too many attempts. Please wait a few minutes, then try again.");
       } else {
-        setAuthError(msg || "Couldn't send magic link. Please try again.");
+        setAuthError(msg || "Couldn't send code. Please try again.");
+      }
+    }
+  }
+
+  async function handleVerifyOtp() {
+    setAuthError(null);
+    const code = otpCode.trim();
+    if (code.length !== 6) { setAuthError("Enter the 6-digit code from your email"); return; }
+    try {
+      await verifyEmailOtp(authEmail.trim().toLowerCase(), code);
+      setAuthOpen(false);
+      setOtpSent(false);
+      setOtpCode('');
+      setAuthEmail('');
+    } catch (e) {
+      const msg = e.message || '';
+      if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('otp')) {
+        setAuthError("That code is incorrect or expired. Request a new one.");
+      } else if (msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('rate')) {
+        setAuthError("Too many attempts. Please wait a few minutes.");
+      } else {
+        setAuthError(msg || "Couldn't verify code. Try again.");
       }
     }
   }
@@ -864,7 +888,7 @@ const [schedule, setSchedule] = useState([]);
           background: "rgba(0,0,0,0.78)",
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: 20,
-        }} onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }}>
+        }} onClick={() => { setAuthOpen(false); setOtpSent(false); setOtpCode(''); setAuthError(null); setAuthEmail(""); }}>
           <div onClick={e => e.stopPropagation()} style={{
             width: "100%", maxWidth: 360,
             background: BRAND.cream, borderRadius: 12,
@@ -873,7 +897,7 @@ const [schedule, setSchedule] = useState([]);
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
             position: "relative",
           }}>
-            <button onClick={() => { setAuthOpen(false); setMagicLinkSent(false); setAuthError(null); setAuthEmail(""); }} style={{
+            <button onClick={() => { setAuthOpen(false); setOtpSent(false); setOtpCode(''); setAuthError(null); setAuthEmail(""); }} style={{
               position: "absolute", top: 12, right: 12,
               background: "transparent", border: "none", cursor: "pointer",
               fontSize: 18, color: BRAND.muted, lineHeight: 1, padding: 4,
@@ -883,13 +907,13 @@ const [schedule, setSchedule] = useState([]);
               <LogoMark size={80} />
             </div>
 
-            {!magicLinkSent ? (
+            {!otpSent ? (
               <>
                 <div className="oswald" style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, color: BRAND.charcoal }}>
                   SIGN IN
                 </div>
                 <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 18, fontWeight: 500 }}>
-                  No password needed — we'll email you a magic link.
+                  No password needed — we'll email you a 6-digit sign-in code.
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: "block", fontSize: 10, color: "#7A8890", marginBottom: 5, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>Email</label>
@@ -919,20 +943,48 @@ const [schedule, setSchedule] = useState([]);
                   fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
                   fontFamily: "'Oswald', sans-serif",
                   boxShadow: `0 4px 0 ${BRAND.greenDark}`,
-                }}>SEND MAGIC LINK →</button>
+                }}>SEND CODE →</button>
               </>
             ) : (
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
-                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: BRAND.charcoal, marginBottom: 8 }}>
-                  CHECK YOUR EMAIL
+              <div>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: BRAND.charcoal, marginBottom: 4 }}>
+                  ENTER YOUR CODE
                 </div>
-                <div style={{ fontSize: 13, color: "#5A6770", fontWeight: 500, lineHeight: 1.5, marginBottom: 18 }}>
-                  We sent a magic link to <strong>{authEmail}</strong>.<br />
-                  Click it to sign in — no password needed.
+                <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 16, fontWeight: 500 }}>
+                  We sent a 6-digit code to <strong>{authEmail}</strong>
                 </div>
-                <button onClick={() => { setMagicLinkSent(false); setAuthEmail(""); setAuthError(null); }} style={{
-                  background: "transparent", border: `1.5px solid #9BA8B0`, borderRadius: 7,
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '')); setAuthError(null); }}
+                  onKeyDown={e => e.key === "Enter" && handleVerifyOtp()}
+                  placeholder="000000"
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "14px 13px", borderRadius: 8, marginBottom: 12,
+                    background: BRAND.white, border: `1.5px solid rgba(45,58,66,0.15)`,
+                    color: BRAND.charcoal, fontSize: 28, outline: "none", fontWeight: 700,
+                    fontFamily: "'Oswald', sans-serif", letterSpacing: 10, textAlign: "center",
+                  }}
+                />
+                {authError && (
+                  <div style={{
+                    background: "rgba(232,69,69,0.08)", border: `1.5px solid ${BRAND.red}`,
+                    color: BRAND.red, borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 12, fontWeight: 600,
+                  }}>{authError}</div>
+                )}
+                <button onClick={handleVerifyOtp} style={{
+                  width: "100%", padding: "13px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: BRAND.green, color: BRAND.charcoal,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
+                  fontFamily: "'Oswald', sans-serif",
+                  boxShadow: `0 4px 0 ${BRAND.greenDark}`,
+                  marginBottom: 10,
+                }}>VERIFY CODE →</button>
+                <button onClick={() => { setOtpSent(false); setOtpCode(''); setAuthError(null); }} style={{
+                  width: "100%", background: "transparent", border: `1.5px solid #9BA8B0`, borderRadius: 7,
                   padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#5A6770",
                   cursor: "pointer", fontFamily: "'Oswald', sans-serif", letterSpacing: 1,
                 }}>← USE DIFFERENT EMAIL</button>
