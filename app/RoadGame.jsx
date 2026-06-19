@@ -441,7 +441,7 @@ export default function RoadGame() {
   async function handleVerifyOtp() {
     setAuthError(null);
     const code = otpCode.trim();
-    if (code.length !== 6) { setAuthError("Enter the 6-digit code from your email"); return; }
+    if (code.length < 6 || code.length > 8) { setAuthError("Enter the code from your email"); return; }
     try {
       await verifyEmailOtp(authEmail.trim().toLowerCase(), code);
       setAuthOpen(false);
@@ -969,16 +969,16 @@ const [schedule, setSchedule] = useState([]);
                   ENTER YOUR CODE
                 </div>
                 <div style={{ fontSize: 12, color: "#5A6770", marginBottom: 16, fontWeight: 500 }}>
-                  We sent a 6-digit code to <strong>{authEmail}</strong>
+                  We sent a sign-in code to <strong>{authEmail}</strong>
                 </div>
                 <input
                   type="text"
                   inputMode="numeric"
-                  maxLength={6}
+                  maxLength={8}
                   value={otpCode}
                   onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '')); setAuthError(null); }}
                   onKeyDown={e => e.key === "Enter" && handleVerifyOtp()}
-                  placeholder="000000"
+                  placeholder="00000000"
                   autoFocus
                   style={{
                     width: "100%", padding: "14px 13px", borderRadius: 8, marginBottom: 12,
