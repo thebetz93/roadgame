@@ -1456,12 +1456,13 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
       </div>
 
       {travelTab === "tickets" && (() => {
-        const sgUrl = `https://seatgeek.com/search?q=${query}${SEATGEEK_CLIENT_ID ? `&client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
+        const teamQ = encodeURIComponent(activeTeam.team);
+        const sgUrl = `https://seatgeek.com/search?q=${teamQ}${SEATGEEK_CLIENT_ID ? `&client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
         const vendors = [
           { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49", url: sgUrl, highlight: !!SEATGEEK_CLIENT_ID },
-          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${query}` },
-          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${query}` },
-          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${query}` },
+          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${teamQ}` },
+          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${teamQ}` },
+          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${teamQ}` },
         ];
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
