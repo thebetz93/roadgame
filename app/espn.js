@@ -128,8 +128,9 @@ function parseEvent(event, ourTeam) {
   const awayApi  = awayComp.team?.displayName;
 
   const homeKey = resolveVenueKey(homeApi);
-  if (!homeKey) return null;
-  const venueData = VENUES[homeKey];
+  // Don't drop the game if the home team isn't in VENUES (common for CFB non-major opponents)
+  // Fall back to ESPN's own venue fields which include city/name for all games
+  const venueData = homeKey ? VENUES[homeKey] : null;
 
   const nick = ourTeam.split(' ').pop().toLowerCase();
   const isHome = (homeApi || '').toLowerCase().includes(nick);
@@ -138,18 +139,18 @@ function parseEvent(event, ourTeam) {
   const v = comp.venue;
   const city = v?.address?.city && v?.address?.state
     ? `${v.address.city}, ${v.address.state}`
-    : v?.address?.city || venueData.c || 'TBD';
+    : v?.address?.city || venueData?.c || 'TBD';
 
   return {
     id: `espn-${event.id}`,
-    home: homeKey,
+    home: homeKey || homeApi,
     away: awayKey,
     isHome,
     dateISO,
-    venue: v?.fullName || venueData.v || 'TBD',
+    venue: v?.fullName || venueData?.v || 'TBD',
     city,
-    lat: venueData.lat,
-    lng: venueData.lng,
+    lat: venueData?.lat ?? null,
+    lng: venueData?.lng ?? null,
     ticketsFrom: null,
     realData: true,
   };
