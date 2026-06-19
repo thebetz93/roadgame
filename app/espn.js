@@ -8,6 +8,7 @@ const SPORT = {
   nba: 'basketball/nba',
   mlb: 'baseball/mlb',
   nhl: 'hockey/nhl',
+  cfb: 'football/college-football',
 };
 
 // Hardcoded ESPN abbreviations — skips the unreliable team-search lookup
@@ -58,6 +59,34 @@ const ABBR = {
   "St. Louis Blues":"stl","Tampa Bay Lightning":"tbl","Toronto Maple Leafs":"tor",
   "Utah Mammoth":"uta","Vancouver Canucks":"van","Vegas Golden Knights":"vgk",
   "Washington Capitals":"wsh","Winnipeg Jets":"wpg",
+  // CFB - SEC
+  "Alabama Crimson Tide":"ala","Arkansas Razorbacks":"ark","Auburn Tigers":"aub",
+  "Florida Gators":"fla","Georgia Bulldogs":"uga","Kentucky Wildcats":"uk",
+  "LSU Tigers":"lsu","Mississippi State Bulldogs":"msst","Missouri Tigers":"mo",
+  "Oklahoma Sooners":"okla","Ole Miss Rebels":"miss","South Carolina Gamecocks":"sc",
+  "Tennessee Volunteers":"tenn","Texas Longhorns":"tex","Texas A&M Aggies":"tamu",
+  "Vanderbilt Commodores":"van",
+  // CFB - Big Ten
+  "Illinois Fighting Illini":"ill","Indiana Hoosiers":"ind","Iowa Hawkeyes":"iowa",
+  "Maryland Terrapins":"md","Michigan Wolverines":"mich","Michigan State Spartans":"msu",
+  "Minnesota Golden Gophers":"minn","Nebraska Cornhuskers":"neb","Northwestern Wildcats":"nw",
+  "Ohio State Buckeyes":"osu","Penn State Nittany Lions":"psu","Purdue Boilermakers":"pur",
+  "Rutgers Scarlet Knights":"rutg","Wisconsin Badgers":"wis","UCLA Bruins":"ucla",
+  "USC Trojans":"usc","Oregon Ducks":"ore","Washington Huskies":"wash",
+  // CFB - Big 12
+  "Arizona Wildcats":"ariz","Arizona State Sun Devils":"asu","Baylor Bears":"bay",
+  "BYU Cougars":"byu","Cincinnati Bearcats":"cin","Colorado Buffaloes":"colo",
+  "Houston Cougars":"hou","Iowa State Cyclones":"iast","Kansas Jayhawks":"kan",
+  "Kansas State Wildcats":"ksu","Oklahoma State Cowboys":"okst","TCU Horned Frogs":"tcu",
+  "Texas Tech Red Raiders":"ttu","UCF Knights":"ucf","Utah Utes":"utah",
+  "West Virginia Mountaineers":"wvu",
+  // CFB - ACC
+  "Boston College Eagles":"bc","Clemson Tigers":"clem","Duke Blue Devils":"duke",
+  "Florida State Seminoles":"fsu","Georgia Tech Yellow Jackets":"gt","Louisville Cardinals":"lou",
+  "Miami Hurricanes":"miami","NC State Wolfpack":"ncst","North Carolina Tar Heels":"unc",
+  "Notre Dame Fighting Irish":"nd","Pittsburgh Panthers":"pitt","Syracuse Orange":"syr",
+  "Virginia Cavaliers":"uva","Virginia Tech Hokies":"vt","Wake Forest Demon Deacons":"wf",
+  "Stanford Cardinal":"stan","California Golden Bears":"cal",
 };
 
 const API_ALIAS = {
@@ -80,7 +109,7 @@ function season(league) {
   const y = new Date().getFullYear();
   const m = new Date().getMonth();
   // NFL: Jan-Feb → completed season (prev year), Mar+ → upcoming season (this year)
-  if (league === 'nfl') return m <= 1 ? y - 1 : y;
+  if (league === 'nfl' || league === 'cfb') return m <= 1 ? y - 1 : y;
   return y;
 }
 
