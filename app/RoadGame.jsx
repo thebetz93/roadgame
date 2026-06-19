@@ -1813,7 +1813,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {modesFor(game.dist).map(m => {
             const info = m === "fly"
-              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: `https://www.google.com/travel/flights/search?q=flights+to+${encodeURIComponent(game.city)}` }
+              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: EXPEDIA_CREATOR_ID ? `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${encodeURIComponent(userCity)},to:${encodeURIComponent(game.city)}&affcid=${EXPEDIA_CREATOR_ID}` : `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${encodeURIComponent(userCity)},to:${encodeURIComponent(game.city)}` }
               : m === "drive"
               ? { est: `~$${Math.round(game.dist * 0.17)} gas`, time: `${Math.round(game.dist / 60)}h`, link: `https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.city)}` }
               : { est: `~$${Math.round(25 + game.dist * 0.08)}`, time: `${Math.ceil(game.dist / 70)}h`, link: "https://www.amtrak.com" };
