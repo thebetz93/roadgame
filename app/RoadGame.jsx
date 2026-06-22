@@ -9,6 +9,14 @@ import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyPro
 const SEATGEEK_CLIENT_ID = "NDc4NzgwMTl8MTc4MTgyNjA5OS45MDgzMzM";
 // Expedia Travel Creator: go to your creator dashboard → copy your creator/affiliate ID
 const EXPEDIA_CREATOR_ID = "expedia-usa.kAAZVLH";
+// Expedia Travel Creator deep-link tracking (from a generated affiliate link).
+// Wrap ANY Expedia destination URL with expediaAffiliate(url) so the click is
+// tracked for commission via camref. Swap the destination freely per game/city.
+const EXPEDIA_AFFILIATE = { siteid: "1", camref: "1110lGF6u", creativeref: "1100l68075" };
+function expediaAffiliate(destinationUrl) {
+  const { siteid, camref, creativeref } = EXPEDIA_AFFILIATE;
+  return `https://expedia.com/affiliate?siteid=${siteid}&landingPage=${encodeURIComponent(destinationUrl)}&camref=${camref}&creativeref=${creativeref}`;
+}
 
 // ─── BRAND PALETTE (matched to logo) ──────────────────────────────────────────
 const BRAND = {
@@ -1819,7 +1827,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {modesFor(game.dist).map(m => {
             const info = m === "fly"
-              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: EXPEDIA_CREATOR_ID ? `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${encodeURIComponent(userCity)},to:${encodeURIComponent(game.city)}&affcid=${EXPEDIA_CREATOR_ID}` : `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${encodeURIComponent(userCity)},to:${encodeURIComponent(game.city)}` }
+              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: expediaAffiliate(`https://www.expedia.com/Flights-Search?mode=search&trip=roundtrip&leg1=from:${userCity},to:${game.city}&passengers=adults:1`) }
               : m === "drive"
               ? { est: `~$${Math.round(game.dist * 0.17)} gas`, time: `${Math.round(game.dist / 60)}h`, link: `https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.city)}` }
               : { est: `~$${Math.round(25 + game.dist * 0.08)}`, time: `${Math.ceil(game.dist / 70)}h`, link: "https://www.amtrak.com" };
