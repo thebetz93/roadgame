@@ -841,6 +841,7 @@ const [schedule, setSchedule] = useState([]);
       fontFamily: "'Inter', sans-serif",
       color: BRAND.cream,
       paddingBottom: 70,
+      overflowX: "hidden",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -1056,42 +1057,44 @@ const [schedule, setSchedule] = useState([]);
         padding: "11px 14px", position: "sticky", top: 0, zIndex: 50,
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <LogoMark size={36} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+          <LogoMark size={32} />
           <button onClick={() => { setLocInput(userCity); setLocPickerOpen(true); }} style={{
-            background: "transparent", border: "none", cursor: "pointer", padding: 0,
+            background: "transparent", border: "none", cursor: "pointer", padding: 0, minWidth: 0,
           }}>
             {userCity ? (
-              <div style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
-                {userCity}
+              <div style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "40vw" }}>
+                📍 {userCity}
               </div>
             ) : (
-              <div style={{ fontSize: 9, color: BRAND.green, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
+              <div style={{ fontSize: 9, color: BRAND.green, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600, whiteSpace: "nowrap" }}>
                 📍 SET LOCATION
               </div>
             )}
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
           {weekAlerts.length > 0 && (
             <div style={{
               background: BRAND.green, color: BRAND.charcoal,
-              borderRadius: 999, padding: "3px 9px", fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+              borderRadius: 999, width: 22, height: 22,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 800,
               fontFamily: "'Oswald', sans-serif",
-            }}>● {weekAlerts.length} THIS WEEK</div>
+            }}>{weekAlerts.length}</div>
           )}
           {user ? (
             <button onClick={() => setView("profile")} style={{
               width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
               background: view === "profile" ? BRAND.green : BRAND.slateLight,
               color: view === "profile" ? BRAND.charcoal : BRAND.cream,
-              fontSize: 13, fontWeight: 800,
+              fontSize: 13, fontWeight: 800, flexShrink: 0,
             }}>{user.name[0].toUpperCase()}</button>
           ) : (
             <button onClick={() => setAuthOpen(true)} className="oswald" style={{
-              padding: "5px 13px", borderRadius: 8, border: "none", cursor: "pointer",
+              padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
               background: BRAND.green, color: BRAND.charcoal,
-              fontSize: 11, fontWeight: 700, letterSpacing: 1,
+              fontSize: 11, fontWeight: 700, letterSpacing: 1, flexShrink: 0,
             }}>SIGN IN</button>
           )}
         </div>
