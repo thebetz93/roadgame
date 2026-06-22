@@ -840,7 +840,7 @@ const [schedule, setSchedule] = useState([]);
       background: BRAND.slate,
       fontFamily: "'Inter', sans-serif",
       color: BRAND.cream,
-      paddingBottom: 70,
+      paddingBottom: "calc(70px + env(safe-area-inset-bottom))",
       overflowX: "hidden",
     }}>
       <style>{`
@@ -1054,7 +1054,11 @@ const [schedule, setSchedule] = useState([]);
       <div style={{
         background: BRAND.slateDark,
         borderBottom: `2px solid ${BRAND.green}`,
-        padding: "11px 14px", position: "sticky", top: 0, zIndex: 50,
+        paddingTop: "calc(11px + env(safe-area-inset-top))",
+        paddingBottom: 11,
+        paddingLeft: "calc(14px + env(safe-area-inset-left))",
+        paddingRight: "calc(14px + env(safe-area-inset-right))",
+        position: "sticky", top: 0, zIndex: 50,
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
@@ -1619,7 +1623,9 @@ const [schedule, setSchedule] = useState([]);
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
         background: BRAND.slateDark, borderTop: `1px solid ${BRAND.greenGlow}`,
-        padding: "7px 14px 12px", textAlign: "center",
+        paddingTop: 7,
+        paddingBottom: "calc(12px + env(safe-area-inset-bottom))",
+        paddingLeft: 14, paddingRight: 14, textAlign: "center",
       }}>
         <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 2, fontWeight: 600 }}>
           ROADGAME · ADMIT ONE
