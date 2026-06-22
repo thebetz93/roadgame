@@ -1514,7 +1514,9 @@ const [schedule, setSchedule] = useState([]);
               <div key={game.id} style={{ marginBottom: isExpanded ? 0 : 7, opacity: reachable ? 1 : 0.4 }}>
                 <div onClick={() => { setExpanded(isExpanded ? null : game.id); setTravelTab("tickets"); }} style={{
                   background: isExpanded ? "rgba(124,194,66,0.06)" : BRAND.slateLight,
-                  border: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                  borderTop: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                  borderRight: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                  borderBottom: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
                   borderLeft: `4px solid ${game.isHome ? BRAND.green : BRAND.amber}`,
                   borderRadius: 10, padding: "11px 13px", cursor: "pointer",
                   borderBottomLeftRadius: isExpanded ? 0 : 10, borderBottomRightRadius: isExpanded ? 0 : 10,
@@ -1605,7 +1607,9 @@ function AlertCard({ alert: a, onTap, urgent }) {
   return (
     <div onClick={onTap} style={{
       background: urgent ? "rgba(232,69,69,0.08)" : BRAND.slateLight,
-      border: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
+      borderTop: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
+      borderRight: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
+      borderBottom: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
       borderLeft: `4px solid ${urgent ? BRAND.red : BRAND.green}`,
       borderRadius: 10, padding: "11px 13px", marginBottom: 7,
       cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
