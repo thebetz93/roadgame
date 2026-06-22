@@ -1088,12 +1088,12 @@ const [schedule, setSchedule] = useState([]);
             }}>{weekAlerts.length}</div>
           )}
           {user ? (
-            <button onClick={() => setView("profile")} style={{
-              width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
+            <button onClick={() => setView("profile")} className="oswald" style={{
+              height: 32, padding: "0 10px", borderRadius: 8, border: "none", cursor: "pointer",
               background: view === "profile" ? BRAND.green : BRAND.slateLight,
               color: view === "profile" ? BRAND.charcoal : BRAND.cream,
-              fontSize: 13, fontWeight: 800, flexShrink: 0,
-            }}>{user.name[0].toUpperCase()}</button>
+              fontSize: 12, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap",
+            }}>{user.name.split(" ")[0].toUpperCase()}</button>
           ) : (
             <button onClick={() => setAuthOpen(true)} className="oswald" style={{
               padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
