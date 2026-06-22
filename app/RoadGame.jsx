@@ -1093,7 +1093,7 @@ const [schedule, setSchedule] = useState([]);
               background: view === "profile" ? BRAND.green : BRAND.slateLight,
               color: view === "profile" ? BRAND.charcoal : BRAND.cream,
               fontSize: 12, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap",
-            }}>{user.name.split(" ")[0].toUpperCase()}</button>
+            }}>Welcome, {user.name.split(" ")[0]}</button>
           ) : (
             <button onClick={() => setAuthOpen(true)} className="oswald" style={{
               padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
