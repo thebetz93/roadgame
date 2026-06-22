@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
+import { fetchTeamTicketPrices } from "./seatgeek";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
@@ -256,6 +257,24 @@ function generateSchedule(team, league) {
 
 function fmtDate(iso) { return new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function fmtTime(iso) { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
+// Human-friendly relative date, e.g. "Today", "Tomorrow", "This Sat", "In 3 wks".
+// Returns { text, soon } where soon = within a week. Null for past dates.
+function relInfo(iso) {
+  const now = new Date();
+  const d = new Date(iso);
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const days = Math.round((b - a) / 86400000);
+  if (days < 0) return null;
+  let text;
+  if (days === 0) text = "Today";
+  else if (days === 1) text = "Tomorrow";
+  else if (days < 7) text = `This ${d.toLocaleDateString("en-US", { weekday: "short" })}`;
+  else if (days < 14) text = `Next ${d.toLocaleDateString("en-US", { weekday: "short" })}`;
+  else if (days < 60) text = `In ${Math.round(days / 7)} wks`;
+  else text = `In ${Math.round(days / 30)} mo`;
+  return { text, soon: days <= 7 };
+}
 function travelTier(d) {
   if (d < 100) return { label: "LOCAL", color: BRAND.green, bg: BRAND.greenGlow };
   if (d < 400) return { label: "ROAD TRIP", color: BRAND.amber, bg: "rgba(242,165,56,0.15)" };
@@ -654,10 +673,13 @@ const [schedule, setSchedule] = useState([]);
         setSchedule([]);
         setScheduleError(true);
       } else if (realGames.length > 0) {
+        // Best-effort ticket prices from SeatGeek, matched by game date.
+        const priceMap = await fetchTeamTicketPrices(activeTeam.team, activeTeam.league, SEATGEEK_CLIENT_ID);
+        if (cancelled) return;
         const enriched = realGames.map(g => ({
           ...g,
           dist: haversine(userLat, userLng, g.lat, g.lng),
-          ticketsFrom: g.ticketsFrom || null,
+          ticketsFrom: g.ticketsFrom ?? priceMap[g.dateISO?.slice(0, 10)] ?? null,
         }));
         setSchedule(enriched);
       } else {
@@ -1538,6 +1560,7 @@ const [schedule, setSchedule] = useState([]);
             const tier = travelTier(game.dist);
             const isExpanded = expanded === game.id;
             const reachable = game.dist <= maxDist;
+            const rel = relInfo(game.dateISO);
             return (
               <div key={game.id} style={{ marginBottom: isExpanded ? 0 : 7, opacity: reachable ? 1 : 0.4 }}>
                 <div onClick={() => { setExpanded(isExpanded ? null : game.id); setTravelTab("tickets"); }} style={{
@@ -1561,6 +1584,12 @@ const [schedule, setSchedule] = useState([]);
                           color: game.isHome ? BRAND.charcoal : BRAND.amber,
                           padding: "1px 6px", borderRadius: 3,
                         }}>{game.isHome ? "HOME" : "AWAY"}</span>
+                        {rel && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                            color: rel.soon ? BRAND.amber : BRAND.muted,
+                          }}>{rel.text.toUpperCase()}</span>
+                        )}
                       </div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.cream }}>
                         {game.isHome ? `vs ${game.away}` : `@ ${game.home}`}
@@ -1632,6 +1661,7 @@ function Stat({ value, label, accent = BRAND.cream }) {
 
 function AlertCard({ alert: a, onTap, urgent }) {
   const tier = travelTier(a.dist);
+  const rel = relInfo(a.dateISO);
   return (
     <div onClick={onTap} style={{
       background: urgent ? "rgba(232,69,69,0.08)" : BRAND.slateLight,
@@ -1643,8 +1673,17 @@ function AlertCard({ alert: a, onTap, urgent }) {
       cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="oswald" style={{ fontSize: 10, color: urgent ? BRAND.red : BRAND.green, fontWeight: 700, letterSpacing: 1.2, marginBottom: 3 }}>
-          {urgent ? "● URGENT · " : ""}{fmtDate(a.dateISO).toUpperCase()} · {fmtTime(a.dateISO)}
+        <div className="oswald" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <span style={{ fontSize: 10, color: urgent ? BRAND.red : BRAND.green, fontWeight: 700, letterSpacing: 1.2 }}>
+            {urgent ? "● URGENT · " : ""}{fmtDate(a.dateISO).toUpperCase()} · {fmtTime(a.dateISO)}
+          </span>
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: 1,
+            background: a.isHome ? BRAND.green : "rgba(242,165,56,0.2)",
+            color: a.isHome ? BRAND.charcoal : BRAND.amber,
+            padding: "1px 6px", borderRadius: 3,
+          }}>{a.isHome ? "HOME" : "AWAY"}</span>
+          {rel && <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.5, color: BRAND.muted }}>{rel.text.toUpperCase()}</span>}
         </div>
         <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>
           {a.team} {a.isHome ? `vs ${a.away}` : `@ ${a.home}`}

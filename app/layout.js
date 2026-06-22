@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import PWA from "./PWA";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,12 +36,27 @@ export const metadata = {
     description: "Plan your sports road trips — find games, book travel, and follow your favorite teams.",
     images: ["https://myroadgame.com/logo.png"],
   },
+  appleWebApp: {
+    capable: true,
+    title: "RoadGame",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport = {
+  themeColor: "#2D3A42",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PWA />
+      </body>
     </html>
   );
 }
