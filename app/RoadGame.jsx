@@ -1369,7 +1369,9 @@ const [schedule, setSchedule] = useState([]);
             return (
               <div key={i} onClick={() => openSchedule(f.team, f.league)} style={{
                 background: BRAND.slateLight,
-                border: `1px solid rgba(245,239,226,0.08)`,
+                borderTop: `1px solid rgba(245,239,226,0.08)`,
+                borderRight: `1px solid rgba(245,239,226,0.08)`,
+                borderBottom: `1px solid rgba(245,239,226,0.08)`,
                 borderLeft: `4px solid ${BRAND.green}`,
                 borderRadius: 10, padding: "13px 14px", marginBottom: 8,
                 cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
