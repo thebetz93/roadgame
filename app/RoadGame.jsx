@@ -7,8 +7,6 @@ import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyPro
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
 // SeatGeek: go to developer.seatgeek.com → Authentication → copy your client_id
 const SEATGEEK_CLIENT_ID = "NDc4NzgwMTl8MTc4MTgyNjA5OS45MDgzMzM";
-// Expedia Travel Creator: go to your creator dashboard → copy your creator/affiliate ID
-const EXPEDIA_CREATOR_ID = "expedia-usa.kAAZVLH";
 // Expedia Travel Creator deep-link tracking (from a generated affiliate link).
 // Wrap ANY Expedia destination URL with expediaAffiliate(url) so the click is
 // tracked for commission via camref. Swap the destination freely per game/city.
@@ -1791,16 +1789,14 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
             <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>Book via Expedia for best rates</div>
           </div>
           {["Hotels Near Venue", "Downtown Hotels", "Airport Hotels"].map((label, i) => {
-            const expediaBase = EXPEDIA_CREATOR_ID
-              ? `https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&affcid=${EXPEDIA_CREATOR_ID}`
-              : `https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}`;
             const searches = [
               encodeURIComponent(`hotels near ${game.venue}`),
               encodeURIComponent(`downtown ${game.city.split(",")[0]} hotel`),
               encodeURIComponent(`airport hotel ${game.city.split(",")[0]}`),
             ];
+            const hotelDest = `https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&term=${searches[i]}`;
             return (
-              <a key={i} href={`${expediaBase}&term=${searches[i]}`}
+              <a key={i} href={expediaAffiliate(hotelDest)}
                 target="_blank" rel="noopener noreferrer" style={{
                 background: BRAND.slateLight,
                 border: i === 0 ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
