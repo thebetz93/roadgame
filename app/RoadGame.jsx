@@ -848,6 +848,11 @@ const [schedule, setSchedule] = useState([]);
         * { box-sizing: border-box; }
         input[type=range] { height: 4px; accent-color: ${BRAND.green}; }
         .oswald { font-family: 'Oswald', sans-serif; }
+        .acct-initials { display: none; }
+        @media (max-width: 600px) {
+          .acct-full { display: none; }
+          .acct-initials { display: inline; }
+        }
       `}</style>
 
       {toast && (
@@ -1093,7 +1098,10 @@ const [schedule, setSchedule] = useState([]);
               background: view === "profile" ? BRAND.green : BRAND.slateLight,
               color: view === "profile" ? BRAND.charcoal : BRAND.cream,
               fontSize: 12, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap",
-            }}>Welcome, {user.name.split(" ")[0]}</button>
+            }}>
+              <span className="acct-full">Welcome, {user.name.split(" ")[0]}</span>
+              <span className="acct-initials">{user.name.split(" ").filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join("")}</span>
+            </button>
           ) : (
             <button onClick={() => setAuthOpen(true)} className="oswald" style={{
               padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
