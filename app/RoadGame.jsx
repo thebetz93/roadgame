@@ -1369,7 +1369,9 @@ const [schedule, setSchedule] = useState([]);
             return (
               <div key={i} onClick={() => openSchedule(f.team, f.league)} style={{
                 background: BRAND.slateLight,
-                border: `1px solid rgba(245,239,226,0.08)`,
+                borderTop: `1px solid rgba(245,239,226,0.08)`,
+                borderRight: `1px solid rgba(245,239,226,0.08)`,
+                borderBottom: `1px solid rgba(245,239,226,0.08)`,
                 borderLeft: `4px solid ${BRAND.green}`,
                 borderRadius: 10, padding: "13px 14px", marginBottom: 8,
                 cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
@@ -1514,7 +1516,9 @@ const [schedule, setSchedule] = useState([]);
               <div key={game.id} style={{ marginBottom: isExpanded ? 0 : 7, opacity: reachable ? 1 : 0.4 }}>
                 <div onClick={() => { setExpanded(isExpanded ? null : game.id); setTravelTab("tickets"); }} style={{
                   background: isExpanded ? "rgba(124,194,66,0.06)" : BRAND.slateLight,
-                  border: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                  borderTop: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                  borderRight: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
+                  borderBottom: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
                   borderLeft: `4px solid ${game.isHome ? BRAND.green : BRAND.amber}`,
                   borderRadius: 10, padding: "11px 13px", cursor: "pointer",
                   borderBottomLeftRadius: isExpanded ? 0 : 10, borderBottomRightRadius: isExpanded ? 0 : 10,
@@ -1605,7 +1609,9 @@ function AlertCard({ alert: a, onTap, urgent }) {
   return (
     <div onClick={onTap} style={{
       background: urgent ? "rgba(232,69,69,0.08)" : BRAND.slateLight,
-      border: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
+      borderTop: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
+      borderRight: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
+      borderBottom: urgent ? `1.5px solid ${BRAND.red}` : `1px solid rgba(245,239,226,0.06)`,
       borderLeft: `4px solid ${urgent ? BRAND.red : BRAND.green}`,
       borderRadius: 10, padding: "11px 13px", marginBottom: 7,
       cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
@@ -1813,7 +1819,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {modesFor(game.dist).map(m => {
             const info = m === "fly"
-              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: `https://www.google.com/travel/flights/search?q=flights+to+${encodeURIComponent(game.city)}` }
+              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: EXPEDIA_CREATOR_ID ? `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${encodeURIComponent(userCity)},to:${encodeURIComponent(game.city)}&affcid=${EXPEDIA_CREATOR_ID}` : `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${encodeURIComponent(userCity)},to:${encodeURIComponent(game.city)}` }
               : m === "drive"
               ? { est: `~$${Math.round(game.dist * 0.17)} gas`, time: `${Math.round(game.dist / 60)}h`, link: `https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.city)}` }
               : { est: `~$${Math.round(25 + game.dist * 0.08)}`, time: `${Math.ceil(game.dist / 70)}h`, link: "https://www.amtrak.com" };
