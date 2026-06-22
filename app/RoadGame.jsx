@@ -1240,7 +1240,7 @@ const [schedule, setSchedule] = useState([]);
         <div style={{ padding: "16px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div style={{ marginBottom: 14 }}>
             <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
-              HEY{user ? `, ${user.name.split(" ")[0].toUpperCase()}` : ""}.
+              {user ? `HEY, ${user.name.split(" ")[0].toUpperCase()}.` : "WELCOME TO ROADGAME."}
             </div>
             <div style={{ fontSize: 12, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>
               {weekAlerts.length > 0
@@ -1258,16 +1258,16 @@ const [schedule, setSchedule] = useState([]);
             }}>
               <LogoMark size={48} />
               <div className="oswald" style={{ fontSize: 16, fontWeight: 700, color: BRAND.cream, letterSpacing: 0.5, marginTop: 10 }}>
-                START YOUR ROAD GAME
+                SIGN IN TO GET ALERTS
               </div>
               <div style={{ fontSize: 12, color: BRAND.muted, marginTop: 6, marginBottom: 14, lineHeight: 1.5 }}>
                 Pick your favorite teams. We'll alert you when they play near {userCity.split(",")[0]}.
               </div>
-              <button onClick={() => setView("teams")} className="oswald" style={{
+              <button onClick={() => setAuthOpen(true)} className="oswald" style={{
                 background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 8,
                 padding: "10px 20px", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer",
                 boxShadow: `0 3px 0 ${BRAND.greenDark}`,
-              }}>BROWSE TEAMS →</button>
+              }}>SIGN IN →</button>
             </div>
           ) : (
             <>
@@ -1364,9 +1364,29 @@ const [schedule, setSchedule] = useState([]);
           <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>YOUR TEAMS</div>
           <div style={{ fontSize: 11, color: BRAND.muted, marginBottom: 14, fontWeight: 500 }}>{following.length} followed</div>
           {following.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 36, color: BRAND.muted, fontSize: 13 }}>
-              No teams yet — head to the Teams tab.
-            </div>
+            !user ? (
+              <div style={{
+                background: BRAND.slateLight, border: `2px dashed ${BRAND.green}`,
+                borderRadius: 12, padding: "22px", textAlign: "center",
+              }}>
+                <LogoMark size={48} />
+                <div className="oswald" style={{ fontSize: 16, fontWeight: 700, color: BRAND.cream, letterSpacing: 0.5, marginTop: 10 }}>
+                  SIGN IN TO FOLLOW TEAMS
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.muted, marginTop: 6, marginBottom: 14, lineHeight: 1.5 }}>
+                  Follow your favorite teams to track their schedules and get alerts when they play near you.
+                </div>
+                <button onClick={() => setAuthOpen(true)} className="oswald" style={{
+                  background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 8,
+                  padding: "10px 20px", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer",
+                  boxShadow: `0 3px 0 ${BRAND.greenDark}`,
+                }}>SIGN IN →</button>
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: 36, color: BRAND.muted, fontSize: 13 }}>
+                No teams yet — head to the Teams tab.
+              </div>
+            )
           ) : following.map((f, i) => {
             const venue = VENUES[f.team];
             const dist = venue ? haversine(userLat, userLng, venue.lat, venue.lng) : null;
