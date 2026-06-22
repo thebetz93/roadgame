@@ -206,38 +206,49 @@ export async function geocodeCity(query) {
   }
 }
 
+const STATE_ABBREV = {
+  "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA",
+  "Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA",
+  "Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA",
+  "Kansas":"KS","Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD",
+  "Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO",
+  "Montana":"MT","Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ",
+  "New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH",
+  "Oklahoma":"OK","Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC",
+  "South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT",
+  "Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY",
+  "District of Columbia":"DC",
+};
+
 function formatDisplayName(displayName) {
   // Nominatim returns "Charlotte, Mecklenburg County, North Carolina, United States"
   // We want "Charlotte, NC"
   const parts = displayName.split(",").map(p => p.trim());
-  const stateAbbrev = {
-    "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA",
-    "Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA",
-    "Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA",
-    "Kansas":"KS","Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD",
-    "Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO",
-    "Montana":"MT","Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ",
-    "New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH",
-    "Oklahoma":"OK","Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC",
-    "South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT",
-    "Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY",
-    "District of Columbia":"DC",
-  };
   const city = parts[0];
-  const state = parts.find(p => stateAbbrev[p]);
-  if (state) return `${city}, ${stateAbbrev[state]}`;
+  const state = parts.find(p => STATE_ABBREV[p]);
+  if (state) return `${city}, ${STATE_ABBREV[state]}`;
   return parts.slice(0, 2).join(", ");
 }
 
 /**
  * Reverse-geocode coordinates from browser geolocation back to a city name.
+ * Reads Nominatim's structured address so we return an actual city/town
+ * (e.g. "Hendersonville, NC") rather than a county ("Henderson County, NC").
  */
 export async function reverseGeocode(lat, lng) {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=14&addressdetails=1`;
     const res = await fetch(url, { headers: { "Accept-Language": "en" } });
     if (!res.ok) return null;
     const data = await res.json();
+    const a = data.address || {};
+    const locality = a.city || a.town || a.village || a.hamlet
+      || a.municipality || a.suburb || a.county;
+    const stateName = a.state;
+    if (locality && stateName) {
+      const abbr = STATE_ABBREV[stateName];
+      return abbr ? `${locality}, ${abbr}` : `${locality}, ${stateName}`;
+    }
     return formatDisplayName(data.display_name || "");
   } catch (e) {
     return null;
