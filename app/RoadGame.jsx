@@ -688,7 +688,7 @@ const [schedule, setSchedule] = useState([]);
       if (cancelled) return;
 
       if (realGames === null) {
-        // API failure or key not configured — don't claim the season is over
+        // Network/server error — don't claim the season is over
         setSchedule([]);
         setScheduleError(true);
       } else if (realGames.length > 0) {
@@ -702,8 +702,18 @@ const [schedule, setSchedule] = useState([]);
           ticketsFrom: g.ticketsFrom ?? priceMap[g.dateISO?.slice(0, 10)] ?? null,
         }));
         setSchedule(enriched);
+      } else if (activeTeam.league === "cfb") {
+        // No live CFB data yet (offseason / tickets not on Ticketmaster yet).
+        // Use estimated schedule: real venues + approximate dates, wrong opponents.
+        const estimated = generateSchedule(activeTeam.team, activeTeam.league).map(g => ({
+          ...g,
+          dist: haversine(userLat, userLng, g.lat, g.lng),
+          ticketsFrom: null,
+          realData: false,
+        }));
+        setSchedule(estimated);
       } else {
-        // API responded successfully but genuinely no upcoming games
+        // Non-CFB with no upcoming games (end of season)
         setSchedule([]);
       }
       setScheduleLoading(false);
@@ -738,8 +748,13 @@ const [schedule, setSchedule] = useState([]);
     const now = new Date();
     Promise.all(
       teams.map(async team => {
-        const games = await fetchTeamSchedule(team, activeLeague);
-        if (!games) return { team, closest: null };
+        let games = await fetchTeamSchedule(team, activeLeague);
+        // CFB: fall back to estimated schedule (real venues, approximate dates) when
+        // no live data is available yet (offseason / tickets not yet on sale)
+        if ((!games || games.length === 0) && activeLeague === "cfb") {
+          games = generateSchedule(team, activeLeague);
+        }
+        if (!games || games.length === 0) return { team, closest: null };
         const nearby = games
           .filter(g => g.lat && g.lng && new Date(g.dateISO) > now)
           .map(g => ({ ...g, dist: Math.round(haversine(userLat, userLng, g.lat, g.lng)) }))
@@ -1820,6 +1835,21 @@ const [schedule, setSchedule] = useState([]);
               </div>
             </div>
           )}
+          {schedule.length > 0 && schedule[0]?.realData === false && (
+            <div style={{
+              background: "rgba(245,197,66,0.08)",
+              border: "1px solid rgba(245,197,66,0.3)",
+              borderRadius: 8, padding: "8px 12px", marginBottom: 10,
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ fontSize: 14 }}>⚠️</span>
+              <div style={{ fontSize: 11, color: BRAND.amber, fontWeight: 500, lineHeight: 1.4 }}>
+                <strong>Estimated schedule</strong> — real opponents &amp; dates not confirmed yet.
+                Venues and distances are accurate. Check back closer to the season.
+              </div>
+            </div>
+          )}
+
           {visibleSchedule.map(game => {
             const tier = travelTier(game.dist);
             const isExpanded = expanded === game.id;
