@@ -23,10 +23,11 @@ export async function GET(request) {
   }
 
   const day = date.split("T")[0];
-  const kw = encodeURIComponent(`${home} ${away}`);
+  // Search by home team only — more reliable than both names combined
+  const kw = encodeURIComponent(home);
   const url = `${BASE_URL}/events.json?apikey=${API_KEY}` +
     `&keyword=${kw}&startDateTime=${day}T00:00:00Z&endDateTime=${day}T23:59:59Z` +
-    `&classificationName=sports&size=5&countryCode=US`;
+    `&classificationName=sports&size=10&countryCode=US`;
 
   try {
     const res = await fetch(url);
@@ -41,7 +42,7 @@ export async function GET(request) {
       const price = ev.priceRanges?.length
         ? Math.floor(Math.min(...ev.priceRanges.map(r => r.min).filter(Boolean)))
         : null;
-      return Response.json({ price: price > 0 ? price : null, url: ev.url || null });
+      return Response.json({ price: price > 0 ? price : null, url: ev.url || null, name: ev.name });
     }
     return Response.json({ debug: "all_filtered", events: events.map(e => e.name) });
   } catch (e) {
