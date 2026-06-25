@@ -735,13 +735,12 @@ const [schedule, setSchedule] = useState([]);
     setBrowseLeagueLoading(true);
     const teams = TEAMS_BY_LEAGUE[activeLeague] || [];
     const now = new Date();
-    const monthOut = new Date(now.getTime() + 30 * 86400000);
     Promise.all(
       teams.map(async team => {
         const games = await fetchTeamSchedule(team, activeLeague);
         if (!games) return { team, closest: null };
         const nearby = games
-          .filter(g => g.lat && g.lng && new Date(g.dateISO) > now && new Date(g.dateISO) <= monthOut)
+          .filter(g => g.lat && g.lng && new Date(g.dateISO) > now)
           .map(g => ({ ...g, dist: Math.round(haversine(userLat, userLng, g.lat, g.lng)) }))
           .sort((a, b) => a.dist - b.dist);
         return { team, closest: nearby[0] ?? null };
