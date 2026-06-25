@@ -161,7 +161,7 @@ export async function fetchTeamSchedule(teamName, league) {
   const abbr = ABBR[teamName];
   if (!path || !abbr) {
     console.warn(`[ESPN] no mapping for "${teamName}" (${league})`);
-    return null;
+    return fetchFallback(teamName, league);
   }
 
   const yr = season(league);
@@ -170,7 +170,7 @@ export async function fetchTeamSchedule(teamName, league) {
 
   try {
     const res = await fetch(url);
-    if (!res.ok) { console.warn(`[ESPN] HTTP ${res.status}`); return null; }
+    if (!res.ok) { console.warn(`[ESPN] HTTP ${res.status}`); return fetchFallback(teamName, league); }
 
     const json = await res.json();
     const events = json.events || [];
@@ -183,9 +183,26 @@ export async function fetchTeamSchedule(teamName, league) {
       .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
 
     console.log(`[ESPN] ${upcoming.length} upcoming for ${teamName}`);
+    if (upcoming.length === 0) return fetchFallback(teamName, league);
     return upcoming;
   } catch (err) {
     console.warn('[ESPN] error:', err);
+    return fetchFallback(teamName, league);
+  }
+}
+
+async function fetchFallback(teamName, league) {
+  if (!["nfl", "nba", "mlb", "nhl"].includes(league)) return null;
+  console.log(`[Fallback] trying API-Sports for "${teamName}" (${league})`);
+  try {
+    const res = await fetch(
+      `/api/schedule-fallback?team=${encodeURIComponent(teamName)}&league=${league}`
+    );
+    if (!res.ok) return null;
+    const games = await res.json();
+    console.log(`[Fallback] ${games.length} games returned`);
+    return games.length > 0 ? games : null;
+  } catch {
     return null;
   }
 }
