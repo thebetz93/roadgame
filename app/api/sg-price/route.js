@@ -16,31 +16,36 @@ export async function GET(request) {
   if (!home || !away || !date) {
     return Response.json({ error: "Missing params" }, { status: 400 });
   }
-
   if (!SG_CLIENT_ID) {
-    return Response.json({ debug: "no_client_id" });
+    return Response.json({});
   }
 
   const day = date.split("T")[0];
-  const next = new Date(day);
-  next.setDate(next.getDate() + 1);
-  const nextDay = next.toISOString().slice(0, 10);
+  // Query a ±1 day UTC window so late/West-coast games (which land on the next
+  // UTC day) aren't missed, then match on the event's LOCAL date.
+  const start = new Date(day);
+  start.setDate(start.getDate() - 1);
+  const end = new Date(day);
+  end.setDate(end.getDate() + 2);
+  const gte = start.toISOString().slice(0, 10);
+  const lte = end.toISOString().slice(0, 10);
 
   const homeSlug = toSlug(home);
   const url = `https://api.seatgeek.com/2/events?client_id=${SG_CLIENT_ID}` +
-    `&performers.slug=${homeSlug}&datetime_utc.gte=${day}T00:00:00&datetime_utc.lte=${nextDay}T00:00:00&per_page=5`;
+    `&performers.slug=${homeSlug}&datetime_utc.gte=${gte}T00:00:00&datetime_utc.lte=${lte}T00:00:00&per_page=25`;
 
   try {
     const res = await fetch(url);
     const data = await res.json();
     const events = data?.events ?? [];
-    if (!events.length) {
-      return Response.json({ debug: "no_events", status: res.status, total: data?.meta?.total, slug: homeSlug, url });
-    }
-    const ev = events[0];
+    // Match the event whose LOCAL date equals the target day
+    const ev = events.find(e => (e.datetime_local || "").slice(0, 10) === day) || null;
+    if (!ev) return Response.json({});
+    // stats.lowest_price is only populated for partners with pricing scope;
+    // returns null otherwise (deep-link still works).
     const price = ev.stats?.lowest_price ? Math.floor(ev.stats.lowest_price) : null;
     return Response.json({ price, url: ev.url || null });
-  } catch (e) {
-    return Response.json({ debug: "fetch_error", message: e.message });
+  } catch {
+    return Response.json({});
   }
 }

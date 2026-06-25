@@ -17,13 +17,12 @@ export async function GET(request) {
   if (!home || !away || !date) {
     return Response.json({ error: "Missing params" }, { status: 400 });
   }
-
   if (!API_KEY) {
-    return Response.json({ debug: "no_api_key" });
+    return Response.json({});
   }
 
   const day = date.split("T")[0];
-  // Search by home team only — more reliable than both names combined
+  // Search by home team only — more reliable than both names combined.
   const kw = encodeURIComponent(home);
   const url = `${BASE_URL}/events.json?apikey=${API_KEY}` +
     `&keyword=${kw}&startDateTime=${day}T00:00:00Z&endDateTime=${day}T23:59:59Z` +
@@ -33,19 +32,16 @@ export async function GET(request) {
     const res = await fetch(url);
     const data = await res.json();
     const events = data?._embedded?.events ?? [];
-    if (!events.length) {
-      return Response.json({ debug: "no_events", status: res.status, total: data?.page?.totalElements, url });
-    }
     for (const ev of events) {
       const name = (ev.name || "").toLowerCase();
       if (NON_GAME_KEYWORDS.some(k => name.includes(k))) continue;
       const price = ev.priceRanges?.length
         ? Math.floor(Math.min(...ev.priceRanges.map(r => r.min).filter(Boolean)))
         : null;
-      return Response.json({ price: price > 0 ? price : null, url: ev.url || null, name: ev.name });
+      return Response.json({ price: price > 0 ? price : null, url: ev.url || null });
     }
-    return Response.json({ debug: "all_filtered", events: events.map(e => e.name) });
-  } catch (e) {
-    return Response.json({ debug: "fetch_error", message: e.message });
+    return Response.json({});
+  } catch {
+    return Response.json({});
   }
 }
