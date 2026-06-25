@@ -1490,6 +1490,8 @@ const [schedule, setSchedule] = useState([]);
               .filter(a => a.team === f.team && a.league === f.league)
               .sort((a, b) => a.dist - b.dist);
             const urgentCount = teamAlerts.filter(a => a.isWeek).length;
+            const venue = VENUES[f.team];
+            const closestGame = teamAlerts[0] ?? null;
             return (
               <div key={i} style={{ marginBottom: 8 }}>
                 {/* Team header row */}
@@ -1516,7 +1518,8 @@ const [schedule, setSchedule] = useState([]);
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 2, fontWeight: 500 }}>
-                      {teamAlerts.length > 0 ? `CLOSEST GAME: ${teamAlerts[0].city.split(",")[0]}, ${teamAlerts[0].dist} mi` : `No games within ${alertRadius} mi in 30 days`}
+                      {venue ? venue.c : ""}
+                      {closestGame ? ` • Closest Game: ${closestGame.city.split(",")[0]} - ${closestGame.dist}m` : ""}
                     </div>
                   </div>
                   <div style={{ fontSize: 18, color: BRAND.muted, transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "none" }}>›</div>
