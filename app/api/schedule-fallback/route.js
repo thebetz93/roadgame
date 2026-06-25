@@ -139,10 +139,12 @@ async function fetchFromTicketmaster(team, league) {
   if (!key) return [];
 
   const classification = TM_CLASSIFICATION[league] || "Football";
+  // Include sport name in keyword for football to avoid volleyball/basketball bleed-through
+  const keyword = (league === "cfb" || league === "nfl") ? `${team} Football` : team;
   const now = new Date().toISOString().split(".")[0] + "Z";
   const url = `https://app.ticketmaster.com/discovery/v2/events.json` +
     `?apikey=${key}` +
-    `&keyword=${encodeURIComponent(team)}` +
+    `&keyword=${encodeURIComponent(keyword)}` +
     `&classificationName=${encodeURIComponent(classification)}` +
     `&startDateTime=${now}` +
     `&size=30&sort=date,asc&countryCode=US`;
