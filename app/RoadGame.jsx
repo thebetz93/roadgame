@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
 import { fetchTeamTicketPrices } from "./seatgeek";
+import { fetchTMGameInfo } from "./ticketmaster";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
@@ -1989,8 +1990,16 @@ function AlertCard({ alert: a, onTap, urgent }) {
 
 function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) {
   const matchup = game.isHome ? `${activeTeam.team} vs ${game.away}` : `${game.home} vs ${activeTeam.team}`;
-  const query = encodeURIComponent(`${matchup} ${game.city}`);
   const guide = guideFor(game.city);
+  const [tmInfo, setTmInfo] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTMGameInfo(game.home, game.away, game.dateISO).then(info => {
+      if (!cancelled) setTmInfo(info);
+    });
+    return () => { cancelled = true; };
+  }, [game.id]);
 
   return (
     <div style={{
@@ -2022,9 +2031,11 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
         const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const vendors = [
           { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49",
-            url: `https://seatgeek.com/${sgSlug}-tickets` },
+            url: `https://seatgeek.com/${sgSlug}-tickets`,
+            price: game.ticketsFrom ? game.ticketsFrom : null },
           { name: "Ticketmaster", desc: "Official primary", color: "#026CDF",
-            url: `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}` },
+            url: tmInfo?.url || `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}`,
+            price: tmInfo?.price || null },
           { name: "Vivid Seats", desc: "Rewards program", color: "#7B2D8B",
             url: `https://www.vividseats.com/search?searchTerm=${gameQ}` },
           { name: "Gametime", desc: "Last-minute deals", color: "#00A86B",
@@ -2054,7 +2065,9 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
                     <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream }}>{sg.name}</div>
                     <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, background: BRAND.green, color: BRAND.charcoal, borderRadius: 4, padding: "2px 6px" }}>BEST PICK</div>
                   </div>
-                  <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>Deal Score rated · Best prices guaranteed</div>
+                  <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>
+                    {sg.price ? `From $${sg.price} · Deal Score rated` : "Deal Score rated · Best prices guaranteed"}
+                  </div>
                 </div>
               </div>
               <div className="oswald" style={{ fontSize: 12, color: BRAND.green, fontWeight: 700, letterSpacing: 1, whiteSpace: "nowrap" }}>GET TICKETS →</div>
@@ -2074,7 +2087,9 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{v.name}</div>
-                    <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{v.desc}</div>
+                    <div style={{ fontSize: 10, color: v.price ? BRAND.green : BRAND.muted, fontWeight: 500 }}>
+                      {v.price ? `From $${v.price}` : v.desc}
+                    </div>
                   </div>
                 </div>
                 <div className="oswald" style={{ fontSize: 11, color: BRAND.muted, fontWeight: 700, letterSpacing: 1 }}>GET TICKETS →</div>
