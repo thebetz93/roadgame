@@ -372,6 +372,25 @@ export default function RoadGame() {
 
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [alertRadius, setAlertRadius] = useState(350);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [installExpanded, setInstallExpanded] = useState(false);
+  const [installPlatform, setInstallPlatform] = useState("generic");
+  const [gamePlanGame, setGamePlanGame] = useState(null);
+  const [gamePlanTier, setGamePlanTier] = useState("weekender");
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) setInstallPlatform('ios');
+    else if (/Android/.test(ua)) setInstallPlatform('android');
+    else setInstallPlatform('desktop');
+  }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    function handler(e) { if (!e.target.closest('[data-acct-menu]')) setAccountMenuOpen(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     const hasMagicToken = typeof window !== 'undefined' && (window.location.hash.includes('access_token') || window.location.search.includes('code='));
@@ -1082,7 +1101,7 @@ const [schedule, setSchedule] = useState([]);
             )}
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+        <div data-acct-menu style={{ position: "relative", display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
           {weekAlerts.length > 0 && (
             <div style={{
               background: BRAND.green, color: BRAND.charcoal,
@@ -1093,24 +1112,151 @@ const [schedule, setSchedule] = useState([]);
             }}>{weekAlerts.length}</div>
           )}
           {user ? (
-            <button onClick={() => setView("profile")} className="oswald" style={{
+            <button onClick={() => setAccountMenuOpen(o => !o)} className="oswald" style={{
               height: 32, padding: "0 10px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: view === "profile" ? BRAND.green : BRAND.slateLight,
-              color: view === "profile" ? BRAND.charcoal : BRAND.cream,
+              background: accountMenuOpen ? BRAND.green : BRAND.slateLight,
+              color: accountMenuOpen ? BRAND.charcoal : BRAND.cream,
               fontSize: 12, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap",
             }}>
               <span className="acct-full">Welcome, {user.name.split(" ")[0]}</span>
               <span className="acct-initials">{user.name.split(" ").filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join("")}</span>
             </button>
           ) : (
-            <button onClick={() => setAuthOpen(true)} className="oswald" style={{
+            <button onClick={() => setAccountMenuOpen(o => !o)} className="oswald" style={{
               padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: BRAND.green, color: BRAND.charcoal,
+              background: accountMenuOpen ? BRAND.slateLight : BRAND.green,
+              color: accountMenuOpen ? BRAND.cream : BRAND.charcoal,
               fontSize: 11, fontWeight: 700, letterSpacing: 1, flexShrink: 0,
             }}>SIGN IN</button>
           )}
+
+          {accountMenuOpen && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 300,
+              background: BRAND.slateDark, borderRadius: 12,
+              border: `1px solid rgba(124,194,66,0.25)`,
+              boxShadow: "0 16px 48px rgba(0,0,0,0.55)",
+              minWidth: 230, overflow: "hidden",
+            }}>
+              {/* MY ACCOUNT */}
+              <button onClick={() => { setAccountMenuOpen(false); user ? setView("profile") : setAuthOpen(true); }}
+                className="oswald"
+                style={{
+                  width: "100%", textAlign: "left", padding: "14px 16px",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  borderBottom: `1px solid rgba(255,255,255,0.07)`,
+                  display: "flex", alignItems: "center", gap: 10,
+                  color: BRAND.cream, fontSize: 12, fontWeight: 700, letterSpacing: 1,
+                }}>
+                <span style={{ fontSize: 16 }}>👤</span>
+                {user ? "MY ACCOUNT" : "SIGN IN / CREATE ACCOUNT"}
+              </button>
+
+              {/* INSTALL THE APP */}
+              <div>
+                <button onClick={() => setInstallExpanded(x => !x)} className="oswald"
+                  style={{
+                    width: "100%", textAlign: "left", padding: "14px 16px",
+                    background: "transparent", border: "none", cursor: "pointer",
+                    borderBottom: installExpanded ? `1px solid rgba(255,255,255,0.07)` : "none",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    color: BRAND.cream, fontSize: 12, fontWeight: 700, letterSpacing: 1,
+                  }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 16 }}>📲</span> INSTALL THE APP
+                  </span>
+                  <span style={{ color: BRAND.green, fontSize: 14, transform: installExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+                </button>
+
+                {installExpanded && (
+                  <div style={{ padding: "12px 16px 14px", background: "rgba(0,0,0,0.2)" }}>
+                    {installPlatform === 'ios' && (
+                      <>
+                        <InstallStep n={1} text={<>Tap the <strong style={{ color: BRAND.cream }}>Share</strong> button <span style={{ fontSize: 15 }}>⎋</span> at the bottom of Safari</>} />
+                        <InstallStep n={2} text={<>Scroll down and tap <strong style={{ color: BRAND.cream }}>Add to Home Screen</strong></>} />
+                        <InstallStep n={3} text={<>Tap <strong style={{ color: BRAND.cream }}>Add</strong> — RoadGame appears on your home screen</>} />
+                      </>
+                    )}
+                    {installPlatform === 'android' && (
+                      <>
+                        <InstallStep n={1} text={<>Tap the <strong style={{ color: BRAND.cream }}>⋮ menu</strong> in Chrome (top right)</>} />
+                        <InstallStep n={2} text={<>Tap <strong style={{ color: BRAND.cream }}>Add to Home Screen</strong> or <strong style={{ color: BRAND.cream }}>Install App</strong></>} />
+                        <InstallStep n={3} text={<>Tap <strong style={{ color: BRAND.cream }}>Install</strong> — RoadGame opens in its own window</>} />
+                      </>
+                    )}
+                    {installPlatform === 'desktop' && (
+                      <>
+                        <InstallStep n={1} text={<>Look for the <strong style={{ color: BRAND.cream }}>install icon ⊕</strong> on the right side of your address bar</>} />
+                        <InstallStep n={2} text={<>Click it and select <strong style={{ color: BRAND.cream }}>Install</strong></>} />
+                        <InstallStep n={3} text={<>RoadGame opens as a <strong style={{ color: BRAND.cream }}>standalone app</strong> on your desktop</>} />
+                      </>
+                    )}
+                    {installPlatform === 'generic' && (
+                      <InstallStep n={1} text={<>Open in Chrome or Safari and use <strong style={{ color: BRAND.cream }}>"Add to Home Screen"</strong> from the browser menu</>} />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* GAME PLAN Modal */}
+      {gamePlanGame && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 250,
+          background: "rgba(0,0,0,0.82)",
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
+          padding: "0 0 env(safe-area-inset-bottom)",
+        }} onClick={() => setGamePlanGame(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 560,
+            background: BRAND.slateDark,
+            borderRadius: "16px 16px 0 0",
+            border: `1.5px solid ${BRAND.green}`, borderBottom: "none",
+            padding: "20px 16px 28px",
+            maxHeight: "88vh", overflowY: "auto",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div className="oswald" style={{ fontSize: 10, color: BRAND.green, letterSpacing: 2, fontWeight: 700, marginBottom: 3 }}>🗺 GAME PLAN</div>
+                <div className="oswald" style={{ fontSize: 18, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
+                  @ {gamePlanGame.home.toUpperCase()}
+                </div>
+                <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500, marginTop: 2 }}>
+                  {gamePlanGame.venue} · {fmtDate(gamePlanGame.dateISO)}
+                </div>
+              </div>
+              <button onClick={() => setGamePlanGame(null)} style={{ background: "transparent", border: "none", cursor: "pointer", color: BRAND.muted, fontSize: 20, padding: 4, lineHeight: 1 }}>✕</button>
+            </div>
+
+            {/* Tier Selector */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 20 }}>
+              {[
+                { id: "daytrip", emoji: "🎟", label: "DAY TRIP", sub: "Just the game" },
+                { id: "weekender", emoji: "🏨", label: "WEEKENDER", sub: "Stay & explore" },
+                { id: "roadwarrior", emoji: "🚗", label: "ROAD WARRIOR", sub: "Make a week of it" },
+              ].map(tier => (
+                <button key={tier.id} onClick={() => setGamePlanTier(tier.id)} className="oswald"
+                  style={{
+                    padding: "10px 6px", borderRadius: 10, border: `1.5px solid`,
+                    borderColor: gamePlanTier === tier.id ? BRAND.green : "rgba(255,255,255,0.1)",
+                    background: gamePlanTier === tier.id ? "rgba(124,194,66,0.12)" : BRAND.slateLight,
+                    cursor: "pointer", textAlign: "center",
+                  }}>
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{tier.emoji}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: gamePlanTier === tier.id ? BRAND.green : BRAND.cream }}>{tier.label}</div>
+                  <div style={{ fontSize: 9, color: BRAND.muted, fontWeight: 500, marginTop: 2, letterSpacing: 0, textTransform: "none", fontFamily: "'Inter', sans-serif" }}>{tier.sub}</div>
+                </button>
+              ))}
+            </div>
+
+            <GamePlanContent game={gamePlanGame} tier={gamePlanTier} userCity={userCity} />
+          </div>
+        </div>
+      )}
 
       {/* Tab Bar */}
       {!activeTeam && view !== "profile" && (
@@ -1619,6 +1765,16 @@ const [schedule, setSchedule] = useState([]);
                   </div>
                 </div>
 
+                {/* GAME PLAN button — sits between card and expanded panel */}
+                {!isExpanded && !game.isHome && (
+                  <button onClick={e => { e.stopPropagation(); setGamePlanGame(game); setGamePlanTier("weekender"); }} className="oswald"
+                    style={{
+                      width: "100%", marginTop: 3, padding: "7px", borderRadius: "0 0 8px 8px",
+                      background: "rgba(124,194,66,0.12)", border: `1px dashed rgba(124,194,66,0.4)`, borderTop: "none",
+                      color: BRAND.green, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer",
+                    }}>🗺 GAME PLAN THIS TRIP →</button>
+                )}
+
                 {isExpanded && (
                   <ExpandedPanel game={game} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} />
                 )}
@@ -1644,6 +1800,119 @@ const [schedule, setSchedule] = useState([]);
 }
 
 // ─── REUSABLE COMPONENTS ──────────────────────────────────────────────────────
+function spotheroUrl(venue, city) {
+  return `https://spothero.com/search?q=${encodeURIComponent(venue + " " + city)}`;
+}
+
+function GamePlanContent({ game, tier, userCity }) {
+  const teamQ = encodeURIComponent(game.home);
+  const cityName = game.city.split(",")[0];
+  const mapsDir = `https://www.google.com/maps/dir/${encodeURIComponent(userCity || "")}/${encodeURIComponent(game.venue + ", " + game.city)}`;
+  const hotelUrl = expediaAffiliate(`https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&term=${encodeURIComponent("hotels near " + game.venue)}`);
+  const ticketUrl = `https://seatgeek.com/search?q=${teamQ}`;
+  const guide = guideFor(game.city);
+
+  const PlanRow = ({ emoji, label, sublabel, href, cta = "VIEW →" }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      background: BRAND.slateLight, borderRadius: 9, padding: "11px 13px",
+      textDecoration: "none", marginBottom: 7,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 20 }}>{emoji}</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{label}</div>
+          {sublabel && <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>{sublabel}</div>}
+        </div>
+      </div>
+      <div className="oswald" style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: BRAND.green, whiteSpace: "nowrap" }}>{cta}</div>
+    </a>
+  );
+
+  if (tier === "daytrip") return (
+    <div>
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 2, marginBottom: 10 }}>WHAT YOU NEED FOR GAME DAY</div>
+      <PlanRow emoji="🎟" label="Get Tickets" sublabel="Compare SeatGeek, Ticketmaster & more" href={ticketUrl} cta="FIND TICKETS →" />
+      <PlanRow emoji="🅿️" label="Reserve Parking" sublabel={`Near ${game.venue}`} href={spotheroUrl(game.venue, game.city)} cta="BOOK PARKING →" />
+      <PlanRow emoji="🗺️" label="Get Directions" sublabel={`Drive to ${game.venue}`} href={mapsDir} cta="NAVIGATE →" />
+    </div>
+  );
+
+  if (tier === "weekender") return (
+    <div>
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 2, marginBottom: 10 }}>YOUR WEEKEND PLAN IN {cityName.toUpperCase()}</div>
+      <PlanRow emoji="🎟" label="Get Tickets" sublabel="Secure your seats first" href={ticketUrl} cta="FIND TICKETS →" />
+      <PlanRow emoji="🏨" label="Book a Hotel" sublabel={`Near ${game.venue} via Expedia`} href={hotelUrl} cta="BOOK HOTEL →" />
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.green, letterSpacing: 2, margin: "14px 0 8px" }}>WHERE TO EAT & DRINK</div>
+      {[...guide.eat.slice(0,2), ...guide.drink.slice(0,1)].map((item, i) => (
+        <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(item.name + " " + game.city)}`}
+          target="_blank" rel="noopener noreferrer"
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: BRAND.slateLight, borderRadius: 9, padding: "9px 13px", textDecoration: "none", marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.cream }}>{item.name}</div>
+            <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{item.type} · {item.note}</div>
+          </div>
+          <div className="oswald" style={{ fontSize: 9, color: BRAND.amber, fontWeight: 700, background: "rgba(242,165,56,0.12)", padding: "2px 7px", borderRadius: 4 }}>{item.price}</div>
+        </a>
+      ))}
+      {guide.see.length > 0 && (
+        <>
+          <div className="oswald" style={{ fontSize: 9, color: BRAND.green, letterSpacing: 2, margin: "14px 0 8px" }}>ON THE TOWN</div>
+          <PlanRow emoji="🎭" label={guide.see[0].name} sublabel={guide.see[0].type} href={`https://www.google.com/search?q=${encodeURIComponent(guide.see[0].name + " " + game.city)}`} cta="EXPLORE →" />
+        </>
+      )}
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.green, letterSpacing: 2, margin: "14px 0 8px" }}>GAME DAY LOGISTICS</div>
+      <PlanRow emoji="🅿️" label="Reserve Parking" sublabel={`Near ${game.venue}`} href={spotheroUrl(game.venue, game.city)} cta="BOOK PARKING →" />
+      <PlanRow emoji="🗺️" label="Get Directions" sublabel={`Drive to ${game.venue}`} href={mapsDir} cta="NAVIGATE →" />
+    </div>
+  );
+
+  if (tier === "roadwarrior") return (
+    <div>
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 2, marginBottom: 10 }}>THE FULL ROAD WARRIOR EXPERIENCE</div>
+      <PlanRow emoji="🎟" label="Get Tickets" sublabel="Lock in your seats" href={ticketUrl} cta="FIND TICKETS →" />
+      <PlanRow emoji="🏨" label="Book Your Stay" sublabel={`Hotels near ${game.venue}`} href={hotelUrl} cta="BOOK HOTEL →" />
+      <PlanRow emoji="✈️" label="Book Flights" sublabel="Compare fares via Expedia" href={expediaAffiliate("https://www.expedia.com/Flights")} cta="SEARCH FLIGHTS →" />
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.green, letterSpacing: 2, margin: "14px 0 8px" }}>CITY GUIDE · {cityName.toUpperCase()}</div>
+      {[...guide.eat.slice(0,2), ...guide.drink.slice(0,1), ...guide.see.slice(0,1)].map((item, i) => (
+        <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(item.name + " " + game.city)}`}
+          target="_blank" rel="noopener noreferrer"
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: BRAND.slateLight, borderRadius: 9, padding: "9px 13px", textDecoration: "none", marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.cream }}>{item.name}</div>
+            <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{item.type} · {item.note}</div>
+          </div>
+          <div className="oswald" style={{ fontSize: 9, color: BRAND.amber, fontWeight: 700, background: "rgba(242,165,56,0.12)", padding: "2px 7px", borderRadius: 4 }}>{item.price}</div>
+        </a>
+      ))}
+      <div className="oswald" style={{ fontSize: 9, color: BRAND.green, letterSpacing: 2, margin: "14px 0 8px" }}>GAME DAY LOGISTICS</div>
+      <PlanRow emoji="🅿️" label="Reserve Parking" sublabel={`Near ${game.venue}`} href={spotheroUrl(game.venue, game.city)} cta="BOOK PARKING →" />
+      <PlanRow emoji="🗺️" label="Get Directions" sublabel={`Drive to ${game.venue}`} href={mapsDir} cta="NAVIGATE →" />
+      <div style={{ marginTop: 16, background: "rgba(124,194,66,0.07)", border: `1px dashed rgba(124,194,66,0.3)`, borderRadius: 10, padding: "12px 14px" }}>
+        <div className="oswald" style={{ fontSize: 10, color: BRAND.green, letterSpacing: 1.5, fontWeight: 700, marginBottom: 4 }}>🚗 MULTI-GAME ROUTE — COMING SOON</div>
+        <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500, lineHeight: 1.5 }}>
+          We're building a feature that finds other games nearby the same week and maps the full road warrior route. Stay tuned.
+        </div>
+      </div>
+    </div>
+  );
+
+  return null;
+}
+
+function InstallStep({ n, text }) {
+  return (
+    <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
+      <div style={{
+        width: 22, height: 22, borderRadius: "50%", background: BRAND.green, color: BRAND.charcoal,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 800, flexShrink: 0, fontFamily: "'Oswald', sans-serif",
+      }}>{n}</div>
+      <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.5, paddingTop: 2, fontFamily: "'Inter', sans-serif" }}>{text}</div>
+    </div>
+  );
+}
+
 function SectionHeader({ children }) {
   return (
     <div className="oswald" style={{
