@@ -1516,7 +1516,7 @@ const [schedule, setSchedule] = useState([]);
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 2, fontWeight: 500 }}>
-                      {teamAlerts.length > 0 ? `${teamAlerts.length} game${teamAlerts.length === 1 ? "" : "s"} within ${alertRadius} mi` : `No games within ${alertRadius} mi in 30 days`}
+                      {teamAlerts.length > 0 ? `CLOSEST GAME: ${teamAlerts[0].city.split(",")[0]}, ${teamAlerts[0].dist} mi` : `No games within ${alertRadius} mi in 30 days`}
                     </div>
                   </div>
                   <div style={{ fontSize: 18, color: BRAND.muted, transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "none" }}>›</div>
