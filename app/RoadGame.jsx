@@ -1811,7 +1811,8 @@ function GamePlanContent({ game, tier, userCity }) {
   const cityName = game.city.split(",")[0];
   const mapsDir = `https://www.google.com/maps/dir/${encodeURIComponent(userCity || "")}/${encodeURIComponent(game.venue + ", " + game.city)}`;
   const hotelUrl = expediaAffiliate(`https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&term=${encodeURIComponent("hotels near " + game.venue)}`);
-  const ticketUrl = `https://seatgeek.com/search?q=${gameQ}&dateFrom=${date}&dateTo=${date}`;
+  const sgSlug = game.home.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const ticketUrl = `https://seatgeek.com/${sgSlug}-tickets`;
   const guide = guideFor(game.city);
 
   const PlanRow = ({ emoji, label, sublabel, href, cta = "VIEW →" }) => (
@@ -2018,15 +2019,18 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
       {travelTab === "tickets" && (() => {
         const date = game.dateISO.split('T')[0];
         const gameQ = encodeURIComponent(matchup);
+        const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const vendors = [
           { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49",
-            url: `https://seatgeek.com/search?q=${gameQ}&dateFrom=${date}&dateTo=${date}` },
+            url: `https://seatgeek.com/${sgSlug}-tickets` },
           { name: "Ticketmaster", desc: "Official primary", color: "#026CDF",
             url: `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}` },
-          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869",
-            url: `https://www.stubhub.com/secure/search?q=${gameQ}` },
-          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20",
+          { name: "Vivid Seats", desc: "Rewards program", color: "#7B2D8B",
             url: `https://www.vividseats.com/search?searchTerm=${gameQ}` },
+          { name: "Gametime", desc: "Last-minute deals", color: "#00A86B",
+            url: `https://gametime.co/search?q=${gameQ}` },
+          { name: "TickPick", desc: "No fees · Best price", color: "#1A3A6B",
+            url: `https://www.tickpick.com/search?q=${gameQ}` },
         ];
         const [sg, ...rest] = vendors;
         return (
