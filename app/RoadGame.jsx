@@ -16,9 +16,9 @@ function expediaAffiliate(destinationUrl) {
 
 // ─── BRAND PALETTE (matched to logo) ──────────────────────────────────────────
 const BRAND = {
-  slate:      "#2D3A42",  // deep slate navy (background)
-  slateDark:  "#1F2A30",  // darker slate
-  slateLight: "#3B4A52",  // lighter slate (cards)
+  slate:      "#3A4A54",  // page background
+  slateDark:  "#2C3A42",  // header, expanded panels
+  slateLight: "#4A5E6A",  // cards
   cream:      "#F5EFE2",  // ticket cream
   creamDim:   "#D8D2C4",  // muted cream
   green:      "#7CC242",  // signature lime green
