@@ -1,14 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
-import { fetchTeamTicketPrices, fetchSGGameInfo } from "./seatgeek";
-import { fetchTMGameInfo } from "./ticketmaster";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
 
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
-// SeatGeek: go to developer.seatgeek.com → Authentication → copy your client_id
-const SEATGEEK_CLIENT_ID = "NDc4NzgwMTl8MTc4MTgyNjA5OS45MDgzMzM";
 // Expedia Travel Creator deep-link tracking (from a generated affiliate link).
 // Wrap ANY Expedia destination URL with expediaAffiliate(url) so the click is
 // tracked for commission via camref. Swap the destination freely per game/city.
@@ -694,7 +690,8 @@ const [schedule, setSchedule] = useState([]);
         setScheduleError(true);
       } else if (realGames.length > 0) {
         // Best-effort ticket prices from SeatGeek, matched by game date.
-        const priceMap = await fetchTeamTicketPrices(activeTeam.team, activeTeam.league, SEATGEEK_CLIENT_ID);
+        const sgPriceRes = await fetch(`/api/sg-team-prices?team=${encodeURIComponent(activeTeam.team)}&league=${activeTeam.league}`).catch(() => null);
+        const priceMap = sgPriceRes?.ok ? await sgPriceRes.json().catch(() => ({})) : {};
         if (cancelled) return;
         const enriched = realGames.map(g => ({
           ...g,
@@ -1996,8 +1993,13 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
 
   useEffect(() => {
     let cancelled = false;
-    fetchTMGameInfo(game.home, game.away, game.dateISO).then(info => { if (!cancelled) setTmInfo(info); });
-    fetchSGGameInfo(game.home, game.away, game.dateISO).then(info => { if (!cancelled) setSgInfo(info); });
+    const date = game.dateISO;
+    const h = encodeURIComponent(game.home);
+    const a = encodeURIComponent(game.away);
+    fetch(`/api/tm-price?home=${h}&away=${a}&date=${date}`)
+      .then(r => r.json()).then(info => { if (!cancelled) setTmInfo(Object.keys(info).length ? info : null); }).catch(() => {});
+    fetch(`/api/sg-price?home=${h}&away=${a}&date=${date}`)
+      .then(r => r.json()).then(info => { if (!cancelled) setSgInfo(Object.keys(info).length ? info : null); }).catch(() => {});
     return () => { cancelled = true; };
   }, [game.id]);
 
