@@ -376,6 +376,7 @@ export default function RoadGame() {
   const [expandedFollowTeam, setExpandedFollowTeam] = useState(null);
   const [browseLeagueGames, setBrowseLeagueGames] = useState({});
   const [browseLeagueLoading, setBrowseLeagueLoading] = useState(false);
+  const [pushGranted, setPushGranted] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent;
@@ -759,6 +760,40 @@ const [schedule, setSchedule] = useState([]);
     const t = setTimeout(() => setShowSplash(false), 1800);
     return () => clearTimeout(t);
   }, []);
+
+  // Push notification subscription — runs when user is signed in and alerts are enabled
+  useEffect(() => {
+    if (!user || !alertsEnabled) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (Notification.permission === "denied") return;
+
+    setPushGranted(Notification.permission === "granted");
+
+    async function subscribePush() {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) { setPushGranted(true); return; }
+
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+        setPushGranted(true);
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+        });
+
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id, subscription: sub.toJSON() }),
+        });
+      } catch {}
+    }
+
+    subscribePush();
+  }, [user?.id, alertsEnabled]);
 
   // ─────────────── LOADING ────────────────
   if (loading) {
@@ -1388,6 +1423,52 @@ const [schedule, setSchedule] = useState([]);
                 Alerts trigger when followed teams play within {alertRadius} mi of {userCity} in the next 7 days.
               </div>
             </div>
+
+            {alertsEnabled && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.cream }}>Push notifications</div>
+                    <div style={{ fontSize: 11, color: BRAND.muted }}>
+                      {pushGranted ? "Active — you'll get a morning reminder on game week" : "Get notified even when the app is closed"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: pushGranted ? BRAND.green : BRAND.muted }}>
+                    {pushGranted ? "ON" : "OFF"}
+                  </div>
+                </div>
+                {!pushGranted && Notification.permission !== "denied" && (
+                  <button onClick={async () => {
+                    const perm = await Notification.requestPermission();
+                    if (perm !== "granted") return;
+                    setPushGranted(true);
+                    try {
+                      const reg = await navigator.serviceWorker.ready;
+                      const sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+                      });
+                      await fetch("/api/push/subscribe", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userId: user.id, subscription: sub.toJSON() }),
+                      });
+                      showToast("Push notifications enabled!");
+                    } catch {}
+                  }} className="oswald" style={{
+                    marginTop: 10, width: "100%", padding: "9px",
+                    background: BRAND.green, color: BRAND.charcoal,
+                    border: "none", borderRadius: 7, cursor: "pointer",
+                    fontSize: 11, fontWeight: 700, letterSpacing: 1,
+                  }}>ENABLE PUSH NOTIFICATIONS</button>
+                )}
+                {Notification.permission === "denied" && (
+                  <div style={{ fontSize: 10, color: BRAND.red, marginTop: 8 }}>
+                    Notifications blocked in browser settings — enable them to turn this on.
+                  </div>
+                )}
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard title="YOUR STATS">
@@ -1788,7 +1869,7 @@ const [schedule, setSchedule] = useState([]);
                 </div>
 
                 {isExpanded && (
-                  <ExpandedPanel game={game} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} />
+                  <ExpandedPanel game={game} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} showToast={showToast} />
                 )}
               </div>
             );
@@ -1885,11 +1966,37 @@ function AlertCard({ alert: a, onTap, urgent }) {
   );
 }
 
-function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) {
+function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, showToast }) {
   const matchup = game.isHome ? `${activeTeam.team} vs ${game.away}` : `${game.home} vs ${activeTeam.team}`;
   const guide = guideFor(game.city);
   const [tmInfo, setTmInfo] = useState(null);
   const [sgInfo, setSgInfo] = useState(null);
+  const [cityGuide, setCityGuide] = useState(null);
+  const [cityGuideLoading, setCityGuideLoading] = useState(false);
+
+  useEffect(() => {
+    if (travelTab !== "city") return;
+    if (!game.lat || !game.lng) return;
+    if (cityGuide) return;
+    setCityGuideLoading(true);
+    fetch(`/api/city-guide?lat=${game.lat}&lng=${game.lng}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error && (data.eat?.length || data.drink?.length || data.see?.length)) setCityGuide(data);
+        setCityGuideLoading(false);
+      })
+      .catch(() => setCityGuideLoading(false));
+  }, [travelTab, game.lat, game.lng]);
+
+  function shareGame() {
+    const rel = relInfo(game.dateISO);
+    const text = `${matchup} · ${rel?.label ?? ""} · ${game.venue}, ${game.city}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({ title: "RoadGame", text, url: "https://myroadgame.com" }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(`${text}\nhttps://myroadgame.com`).then(() => showToast?.("Copied to clipboard!")).catch(() => {});
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1910,7 +2017,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
       borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
       padding: 13, marginBottom: 7,
     }}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
         {[
           ["tickets", "TICKETS"],
           ["city", "CITY"],
@@ -1925,6 +2032,11 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
             fontSize: 11, fontWeight: 700, letterSpacing: 1,
           }}>{lbl}</button>
         ))}
+        <button onClick={shareGame} title="Share game" style={{
+          marginLeft: "auto", padding: "5px 10px", borderRadius: 6, border: "none",
+          cursor: "pointer", background: BRAND.slateLight, color: BRAND.muted,
+          fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center",
+        }}>⬆</button>
       </div>
 
       {travelTab === "tickets" && (() => {
@@ -2001,56 +2113,65 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
         );
       })()}
 
-      {travelTab === "city" && (
-        <div>
-          <div style={{
-            background: BRAND.cream, color: BRAND.charcoal,
-            borderRadius: 10, padding: "11px 13px", marginBottom: 12,
-            borderLeft: `4px solid ${BRAND.green}`,
-          }}>
-            <div className="oswald" style={{ fontSize: 10, color: BRAND.greenDark, fontWeight: 700, letterSpacing: 1.5 }}>CITY GUIDE</div>
-            <div className="oswald" style={{ fontSize: 17, fontWeight: 700, color: BRAND.charcoal, marginTop: 1, letterSpacing: -0.3 }}>{game.city.toUpperCase()}</div>
-            <div style={{ fontSize: 11, color: "#5A6770", fontStyle: "italic", marginTop: 4, fontWeight: 500 }}>{guide.tagline}</div>
-          </div>
-
-          {[
-            { key: "eat", title: "WHERE TO EAT", items: guide.eat },
-            { key: "drink", title: "WHERE TO DRINK", items: guide.drink },
-            { key: "see", title: "WHAT TO DO", items: guide.see },
-          ].map(section => (
-            <div key={section.key} style={{ marginBottom: 12 }}>
-              <SectionHeader>{section.title}</SectionHeader>
-              {section.items.map((item, i) => (
-                <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(item.name + " " + game.city)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ display: "block", textDecoration: "none", background: BRAND.slateLight, borderRadius: 8, padding: "9px 12px", marginBottom: 5 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.cream }}>{item.name}</div>
-                      <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>{item.type}</div>
-                      <div style={{ fontSize: 10, color: BRAND.green, marginTop: 3, fontStyle: "italic", fontWeight: 500 }}>{item.note}</div>
-                    </div>
-                    <div className="oswald" style={{
-                      fontSize: 10, color: BRAND.amber, fontWeight: 700, flexShrink: 0,
-                      background: "rgba(242,165,56,0.12)", padding: "2px 7px", borderRadius: 4, letterSpacing: 0.5,
-                    }}>{item.price}</div>
-                  </div>
-                </a>
-              ))}
+      {travelTab === "city" && (() => {
+        const liveGuide = cityGuide || null;
+        const fallback = guide;
+        const sections = [
+          { key: "eat", title: "WHERE TO EAT", items: liveGuide?.eat?.length ? liveGuide.eat : fallback.eat },
+          { key: "drink", title: "WHERE TO DRINK", items: liveGuide?.drink?.length ? liveGuide.drink : fallback.drink },
+          { key: "see", title: "WHAT TO DO", items: liveGuide?.see?.length ? liveGuide.see : fallback.see },
+        ];
+        return (
+          <div>
+            <div style={{
+              background: BRAND.cream, color: BRAND.charcoal,
+              borderRadius: 10, padding: "11px 13px", marginBottom: 12,
+              borderLeft: `4px solid ${BRAND.green}`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div className="oswald" style={{ fontSize: 10, color: BRAND.greenDark, fontWeight: 700, letterSpacing: 1.5 }}>CITY GUIDE</div>
+                {cityGuideLoading && <div style={{ fontSize: 9, color: "#5A6770", fontStyle: "italic" }}>loading…</div>}
+                {liveGuide && <div style={{ fontSize: 9, color: BRAND.greenDark, fontWeight: 600 }}>Live data</div>}
+              </div>
+              <div className="oswald" style={{ fontSize: 17, fontWeight: 700, color: BRAND.charcoal, marginTop: 1, letterSpacing: -0.3 }}>{game.city.toUpperCase()}</div>
+              <div style={{ fontSize: 11, color: "#5A6770", fontStyle: "italic", marginTop: 4, fontWeight: 500 }}>{fallback.tagline}</div>
             </div>
-          ))}
 
-          <a href={`https://www.google.com/maps/search/things+to+do+in+${encodeURIComponent(game.city)}`}
-            target="_blank" rel="noopener noreferrer" className="oswald"
-            style={{
-              display: "block", textAlign: "center",
-              background: BRAND.green, color: BRAND.charcoal,
-              borderRadius: 8, padding: "11px",
-              fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textDecoration: "none",
-              boxShadow: `0 3px 0 ${BRAND.greenDark}`,
-            }}>EXPLORE {game.city.split(",")[0].toUpperCase()} →</a>
-        </div>
-      )}
+            {sections.map(section => (
+              <div key={section.key} style={{ marginBottom: 12 }}>
+                <SectionHeader>{section.title}</SectionHeader>
+                {(section.items || []).map((item, i) => (
+                  <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(item.name + " " + game.city)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: "block", textDecoration: "none", background: BRAND.slateLight, borderRadius: 8, padding: "9px 12px", marginBottom: 5 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.cream }}>{item.name}</div>
+                        <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>{item.type}</div>
+                        <div style={{ fontSize: 10, color: BRAND.green, marginTop: 3, fontStyle: "italic", fontWeight: 500 }}>{item.note}</div>
+                      </div>
+                      <div className="oswald" style={{
+                        fontSize: 10, color: BRAND.amber, fontWeight: 700, flexShrink: 0,
+                        background: "rgba(242,165,56,0.12)", padding: "2px 7px", borderRadius: 4, letterSpacing: 0.5,
+                      }}>{item.price}</div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ))}
+
+            <a href={`https://www.google.com/maps/search/things+to+do+in+${encodeURIComponent(game.city)}`}
+              target="_blank" rel="noopener noreferrer" className="oswald"
+              style={{
+                display: "block", textAlign: "center",
+                background: BRAND.green, color: BRAND.charcoal,
+                borderRadius: 8, padding: "11px",
+                fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textDecoration: "none",
+                boxShadow: `0 3px 0 ${BRAND.greenDark}`,
+              }}>EXPLORE {game.city.split(",")[0].toUpperCase()} →</a>
+          </div>
+        );
+      })()}
 
       {travelTab === "hotels" && (() => {
         const checkIn = game.dateISO.split('T')[0];
