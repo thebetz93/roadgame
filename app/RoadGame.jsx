@@ -1805,11 +1805,13 @@ function spotheroUrl(venue, city) {
 }
 
 function GamePlanContent({ game, tier, userCity }) {
-  const teamQ = encodeURIComponent(game.home);
+  const matchup = `${game.home} vs ${game.away}`;
+  const date = game.dateISO.split('T')[0];
+  const gameQ = encodeURIComponent(matchup);
   const cityName = game.city.split(",")[0];
   const mapsDir = `https://www.google.com/maps/dir/${encodeURIComponent(userCity || "")}/${encodeURIComponent(game.venue + ", " + game.city)}`;
   const hotelUrl = expediaAffiliate(`https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&term=${encodeURIComponent("hotels near " + game.venue)}`);
-  const ticketUrl = `https://seatgeek.com/search?q=${teamQ}`;
+  const ticketUrl = `https://seatgeek.com/search?q=${gameQ}&dateFrom=${date}&dateTo=${date}`;
   const guide = guideFor(game.city);
 
   const PlanRow = ({ emoji, label, sublabel, href, cta = "VIEW →" }) => (
@@ -2014,15 +2016,17 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
       </div>
 
       {travelTab === "tickets" && (() => {
-        const teamQ = encodeURIComponent(activeTeam.team);
-        // SeatGeek uses hash-based routing for search, so use the stable performer page URL instead
-        const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const sgUrl = `https://seatgeek.com/${sgSlug}-tickets${SEATGEEK_CLIENT_ID ? `?client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
+        const date = game.dateISO.split('T')[0];
+        const gameQ = encodeURIComponent(matchup);
         const vendors = [
-          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49", url: sgUrl, highlight: !!SEATGEEK_CLIENT_ID },
-          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${teamQ}` },
-          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${teamQ}` },
-          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${teamQ}` },
+          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49",
+            url: `https://seatgeek.com/search?q=${gameQ}&dateFrom=${date}&dateTo=${date}` },
+          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF",
+            url: `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}` },
+          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869",
+            url: `https://www.stubhub.com/secure/search?q=${gameQ}` },
+          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20",
+            url: `https://www.vividseats.com/search?searchTerm=${gameQ}` },
         ];
         const [sg, ...rest] = vendors;
         return (
