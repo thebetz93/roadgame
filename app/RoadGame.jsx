@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
-import { fetchTeamTicketPrices } from "./seatgeek";
+import { fetchTeamTicketPrices, fetchSGGameInfo } from "./seatgeek";
 import { fetchTMGameInfo } from "./ticketmaster";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
@@ -1992,12 +1992,12 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
   const matchup = game.isHome ? `${activeTeam.team} vs ${game.away}` : `${game.home} vs ${activeTeam.team}`;
   const guide = guideFor(game.city);
   const [tmInfo, setTmInfo] = useState(null);
+  const [sgInfo, setSgInfo] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchTMGameInfo(game.home, game.away, game.dateISO).then(info => {
-      if (!cancelled) setTmInfo(info);
-    });
+    fetchTMGameInfo(game.home, game.away, game.dateISO).then(info => { if (!cancelled) setTmInfo(info); });
+    fetchSGGameInfo(game.home, game.away, game.dateISO).then(info => { if (!cancelled) setSgInfo(info); });
     return () => { cancelled = true; };
   }, [game.id]);
 
@@ -2031,8 +2031,8 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
         const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const vendors = [
           { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49",
-            url: `https://seatgeek.com/${sgSlug}-tickets`,
-            price: game.ticketsFrom ? game.ticketsFrom : null },
+            url: sgInfo?.url || `https://seatgeek.com/${sgSlug}-tickets`,
+            price: sgInfo?.price ?? game.ticketsFrom ?? null },
           { name: "Ticketmaster", desc: "Official primary", color: "#026CDF",
             url: tmInfo?.url || `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}`,
             price: tmInfo?.price || null },
