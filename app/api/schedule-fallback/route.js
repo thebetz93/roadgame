@@ -67,6 +67,11 @@ function parseTMEvent(ev, ourTeam) {
   const evName = ev.name || "";
   if (NON_GAME.some(k => evName.toLowerCase().includes(k))) return null;
 
+  // Reject if Ticketmaster's own classification genre isn't football
+  const genre = ev.classifications?.[0]?.genre?.name?.toLowerCase() || "";
+  const subGenre = ev.classifications?.[0]?.subGenre?.name?.toLowerCase() || "";
+  if (genre && !genre.includes("football") && !subGenre.includes("football")) return null;
+
   // Must mention at least part of the team name (last word = nickname e.g. "Bulldogs")
   const nick = ourTeam.split(" ").pop().toLowerCase();
   if (!evName.toLowerCase().includes(nick)) return null;
