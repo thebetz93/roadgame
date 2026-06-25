@@ -67,6 +67,10 @@ function parseTMEvent(ev, ourTeam) {
   const evName = ev.name || "";
   if (NON_GAME.some(k => evName.toLowerCase().includes(k))) return null;
 
+  // Must mention at least part of the team name (last word = nickname e.g. "Bulldogs")
+  const nick = ourTeam.split(" ").pop().toLowerCase();
+  if (!evName.toLowerCase().includes(nick)) return null;
+
   const tmVenue = ev._embedded?.venues?.[0];
   const lat = tmVenue?.location?.latitude  ? parseFloat(tmVenue.location.latitude)  : null;
   const lng = tmVenue?.location?.longitude ? parseFloat(tmVenue.location.longitude) : null;
@@ -106,15 +110,24 @@ function parseTMEvent(ev, ourTeam) {
   };
 }
 
+const TM_CLASSIFICATION = {
+  nfl: "NFL",
+  nba: "NBA",
+  mlb: "MLB",
+  nhl: "NHL",
+  cfb: "College Football",
+};
+
 async function fetchFromTicketmaster(team, league) {
   const key = process.env.NEXT_PUBLIC_TICKETMASTER_KEY;
   if (!key) return [];
 
+  const classification = TM_CLASSIFICATION[league] || "Football";
   const now = new Date().toISOString().split(".")[0] + "Z";
   const url = `https://app.ticketmaster.com/discovery/v2/events.json` +
     `?apikey=${key}` +
     `&keyword=${encodeURIComponent(team)}` +
-    `&classificationName=sports` +
+    `&classificationName=${encodeURIComponent(classification)}` +
     `&startDateTime=${now}` +
     `&size=30&sort=date,asc&countryCode=US`;
 
