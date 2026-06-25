@@ -760,7 +760,7 @@ const [schedule, setSchedule] = useState([]);
           .map(g => ({ ...g, dist: Math.round(haversine(userLat, userLng, g.lat, g.lng)) }))
           .sort((a, b) => a.dist - b.dist);
         return { team, closest: nearby[0] ?? null };
-      }))
+      })
     ).then(results => {
       if (cancelled) return;
       const map = {};
