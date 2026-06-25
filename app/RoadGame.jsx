@@ -1341,9 +1341,9 @@ const [schedule, setSchedule] = useState([]);
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 24, fontWeight: 800, color: BRAND.charcoal,
               fontFamily: "'Oswald', sans-serif",
-            }}>{user.name[0].toUpperCase()}</div>
+            }}>{(user.name || user.email || "?")[0].toUpperCase()}</div>
             <div>
-              <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>{user.name.toUpperCase()}</div>
+              <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>{(user.name || user.email || "User").toUpperCase()}</div>
               <div style={{ fontSize: 12, color: BRAND.muted, fontWeight: 500 }}>{user.email}</div>
             </div>
           </div>
