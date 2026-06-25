@@ -374,6 +374,8 @@ export default function RoadGame() {
   const [installPlatform, setInstallPlatform] = useState("generic");
   const [showSplash, setShowSplash] = useState(true);
   const [expandedFollowTeam, setExpandedFollowTeam] = useState(null);
+  const [browseLeagueGames, setBrowseLeagueGames] = useState({});
+  const [browseLeagueLoading, setBrowseLeagueLoading] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent;
@@ -725,6 +727,34 @@ const [schedule, setSchedule] = useState([]);
     return () => { cancelled = true; };
   }, [following, alertRadius, alertsEnabled, userLat, userLng]);
   const weekAlerts = alerts.filter(a => a.isWeek);
+
+  useEffect(() => {
+    if (view !== "teams" || !userLat || !userLng) return;
+    if (browseLeagueGames[activeLeague]) return;
+    let cancelled = false;
+    setBrowseLeagueLoading(true);
+    const teams = TEAMS_BY_LEAGUE[activeLeague] || [];
+    const now = new Date();
+    const monthOut = new Date(now.getTime() + 30 * 86400000);
+    Promise.all(
+      teams.map(async team => {
+        const games = await fetchTeamSchedule(team, activeLeague);
+        if (!games) return { team, closest: null };
+        const nearby = games
+          .filter(g => g.lat && g.lng && new Date(g.dateISO) > now && new Date(g.dateISO) <= monthOut)
+          .map(g => ({ ...g, dist: Math.round(haversine(userLat, userLng, g.lat, g.lng)) }))
+          .sort((a, b) => a.dist - b.dist);
+        return { team, closest: nearby[0] ?? null };
+      })
+    ).then(results => {
+      if (cancelled) return;
+      const map = {};
+      results.forEach(({ team, closest }) => { map[team] = closest; });
+      setBrowseLeagueGames(prev => ({ ...prev, [activeLeague]: map }));
+      setBrowseLeagueLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [view, activeLeague, userLat, userLng]);
 
   useEffect(() => {
     const t = setTimeout(() => setShowSplash(false), 1800);
@@ -1391,7 +1421,10 @@ const [schedule, setSchedule] = useState([]);
       {/* ── TEAMS BROWSER ── */}
       {view === "teams" && !activeTeam && (
         <div style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
-          <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>PICK YOUR TEAMS</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>PICK YOUR TEAMS</div>
+            {browseLeagueLoading && <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>loading games…</div>}
+          </div>
           <div style={{ fontSize: 11, color: BRAND.muted, marginBottom: 14, fontWeight: 500 }}>5 leagues · 130+ teams</div>
 
           <div style={{ display: "flex", gap: 5, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
@@ -1419,7 +1452,7 @@ const [schedule, setSchedule] = useState([]);
             const dist = venue ? haversine(userLat, userLng, venue.lat, venue.lng) : null;
             const tier = dist !== null ? travelTier(dist) : null;
             const fav = isFollowing(team, activeLeague);
-            const browseClosest = alerts.filter(a => a.team === team && a.league === activeLeague).sort((a, b) => a.dist - b.dist)[0] ?? null;
+            const browseClosest = (browseLeagueGames[activeLeague] ?? {})[team] ?? null;
             return (
               <div key={team} style={{
                 background: fav ? "rgba(124,194,66,0.08)" : BRAND.slateLight,
