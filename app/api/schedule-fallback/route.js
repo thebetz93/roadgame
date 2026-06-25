@@ -58,19 +58,30 @@ const NON_GAME = [
   "parking", "tailgate", "vip", "hospitality", "club pass",
   "experience", "fan fest", "watch party", "open practice",
   "training camp", "presale", "merchandise",
+  "volleyball", "basketball", "softball", "soccer", "lacrosse",
+  "wrestling", "swimming", "tennis", "gymnastics", "track",
 ];
 
-function parseTMEvent(ev, ourTeam) {
+// Genre keyword required per league — must appear in genre OR subGenre
+const REQUIRED_GENRE = {
+  nfl: "football", cfb: "football",
+  nba: "basketball", mlb: "baseball", nhl: "hockey",
+};
+
+function parseTMEvent(ev, ourTeam, league) {
   const dateISO = ev.dates?.start?.dateTime || ev.dates?.start?.localDate;
   if (!dateISO) return null;
 
   const evName = ev.name || "";
   if (NON_GAME.some(k => evName.toLowerCase().includes(k))) return null;
 
-  // Reject if Ticketmaster's own classification genre isn't football
-  const genre = ev.classifications?.[0]?.genre?.name?.toLowerCase() || "";
-  const subGenre = ev.classifications?.[0]?.subGenre?.name?.toLowerCase() || "";
-  if (genre && !genre.includes("football") && !subGenre.includes("football")) return null;
+  // Require genre/subGenre to match the expected sport for this league
+  const requiredGenre = REQUIRED_GENRE[league];
+  if (requiredGenre) {
+    const genre    = ev.classifications?.[0]?.genre?.name?.toLowerCase()    || "";
+    const subGenre = ev.classifications?.[0]?.subGenre?.name?.toLowerCase() || "";
+    if (!genre.includes(requiredGenre) && !subGenre.includes(requiredGenre)) return null;
+  }
 
   // Must mention at least part of the team name (last word = nickname e.g. "Bulldogs")
   const nick = ourTeam.split(" ").pop().toLowerCase();
@@ -143,7 +154,7 @@ async function fetchFromTicketmaster(team, league) {
     const events = data?._embedded?.events ?? [];
     const nowDate = new Date();
     return events
-      .map(ev => parseTMEvent(ev, team))
+      .map(ev => parseTMEvent(ev, team, league))
       .filter(g => g !== null && new Date(g.dateISO) > nowDate)
       .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
   } catch {
