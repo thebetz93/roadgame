@@ -120,8 +120,9 @@ function parseEvent(event, ourTeam) {
   const dateISO = comp.date || event.date;
   if (!dateISO) return null;
 
-  const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
-  const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
+  // Future/scheduled games sometimes omit homeAway; fall back to index order (0=home, 1=away)
+  const homeComp = comp.competitors?.find(c => c.homeAway === 'home') || comp.competitors?.[0];
+  const awayComp = comp.competitors?.find(c => c.homeAway === 'away') || comp.competitors?.[1];
   if (!homeComp || !awayComp) return null;
 
   const homeApi = homeComp.team?.displayName;
@@ -165,44 +166,53 @@ export async function fetchTeamSchedule(teamName, league) {
   }
 
   const yr = season(league);
-  const url = `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}`;
-  console.log(`[ESPN] ${teamName} → ${url}`);
+  const urls = [
+    `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}`,
+    `${BASE}/${path}/teams/${abbr}/schedule`,            // no-season fallback
+  ];
 
-  try {
-    const res = await fetch(url);
-    if (!res.ok) { console.warn(`[ESPN] HTTP ${res.status}`); return fetchFallback(teamName, league); }
+  const now = new Date();
 
-    const json = await res.json();
-    const events = json.events || [];
-    console.log(`[ESPN] ${events.length} total events`);
+  for (const url of urls) {
+    console.log(`[ESPN] ${teamName} → ${url}`);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) { console.warn(`[ESPN] HTTP ${res.status} for ${url}`); continue; }
 
-    const now = new Date();
-    const upcoming = events
-      .map(e => parseEvent(e, teamName))
-      .filter(g => g !== null && new Date(g.dateISO) > now)
-      .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
+      const json = await res.json();
+      const events = json.events || [];
+      console.log(`[ESPN] ${events.length} total events from ${url}`);
+      if (events.length === 0) continue;   // try next URL
 
-    console.log(`[ESPN] ${upcoming.length} upcoming for ${teamName}`);
-    if (upcoming.length === 0) return fetchFallback(teamName, league);
-    return upcoming;
-  } catch (err) {
-    console.warn('[ESPN] error:', err);
-    return fetchFallback(teamName, league);
+      const upcoming = events
+        .map(e => parseEvent(e, teamName))
+        .filter(g => g !== null && new Date(g.dateISO) > now)
+        .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
+
+      console.log(`[ESPN] ${upcoming.length} upcoming for ${teamName}`);
+      if (upcoming.length > 0) return upcoming;
+      // Has events but all are past — don't try more ESPN URLs, go to fallback
+      break;
+    } catch (err) {
+      console.warn('[ESPN] error:', err);
+    }
   }
+
+  return fetchFallback(teamName, league);
 }
 
 async function fetchFallback(teamName, league) {
-  if (!["nfl", "nba", "mlb", "nhl", "cfb"].includes(league)) return null;
-  console.log(`[Fallback] trying API-Sports for "${teamName}" (${league})`);
+  if (!["nfl", "nba", "mlb", "nhl", "cfb"].includes(league)) return [];
+  console.log(`[Fallback] trying schedule-fallback for "${teamName}" (${league})`);
   try {
     const res = await fetch(
       `/api/schedule-fallback?team=${encodeURIComponent(teamName)}&league=${league}`
     );
-    if (!res.ok) return null;
+    if (!res.ok) return null;   // network/server error → show error card
     const games = await res.json();
     console.log(`[Fallback] ${games.length} games returned`);
-    return games.length > 0 ? games : null;
+    return games;               // [] is valid (no listings yet), not an error
   } catch {
-    return null;
+    return null;                // true fetch failure → show error card
   }
 }
