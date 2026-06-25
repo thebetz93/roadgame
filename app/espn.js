@@ -192,7 +192,7 @@ export async function fetchTeamSchedule(teamName, league) {
 }
 
 async function fetchFallback(teamName, league) {
-  if (!["nfl", "nba", "mlb", "nhl"].includes(league)) return null;
+  if (!["nfl", "nba", "mlb", "nhl", "cfb"].includes(league)) return null;
   console.log(`[Fallback] trying API-Sports for "${teamName}" (${league})`);
   try {
     const res = await fetch(
