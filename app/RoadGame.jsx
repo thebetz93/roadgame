@@ -1419,6 +1419,7 @@ const [schedule, setSchedule] = useState([]);
             const dist = venue ? haversine(userLat, userLng, venue.lat, venue.lng) : null;
             const tier = dist !== null ? travelTier(dist) : null;
             const fav = isFollowing(team, activeLeague);
+            const browseClosest = alerts.filter(a => a.team === team && a.league === activeLeague).sort((a, b) => a.dist - b.dist)[0] ?? null;
             return (
               <div key={team} style={{
                 background: fav ? "rgba(124,194,66,0.08)" : BRAND.slateLight,
@@ -1428,7 +1429,11 @@ const [schedule, setSchedule] = useState([]);
               }}>
                 <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => openSchedule(team, activeLeague)}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{team}</div>
-                  {venue && <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>{venue.c} · {dist} mi</div>}
+                  {venue && (
+                    <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>
+                      {venue.c}{browseClosest ? ` • Closest Game: ${browseClosest.city.split(",")[0]} - ${browseClosest.dist}m` : dist !== null ? ` • ${dist}m` : ""}
+                    </div>
+                  )}
                 </div>
                 {tier && (
                   <div className="oswald" style={{
@@ -1490,8 +1495,6 @@ const [schedule, setSchedule] = useState([]);
               .filter(a => a.team === f.team && a.league === f.league)
               .sort((a, b) => a.dist - b.dist);
             const urgentCount = teamAlerts.filter(a => a.isWeek).length;
-            const venue = VENUES[f.team];
-            const closestGame = teamAlerts[0] ?? null;
             return (
               <div key={i} style={{ marginBottom: 8 }}>
                 {/* Team header row */}
@@ -1518,8 +1521,9 @@ const [schedule, setSchedule] = useState([]);
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 2, fontWeight: 500 }}>
-                      {venue ? venue.c : ""}
-                      {closestGame ? ` • Closest Game: ${closestGame.city.split(",")[0]} - ${closestGame.dist}m` : ""}
+                      {teamAlerts.length > 0
+                        ? `${teamAlerts.length} game${teamAlerts.length === 1 ? "" : "s"} within ${alertRadius} mi`
+                        : `No games within ${alertRadius} mi in 30 days`}
                     </div>
                   </div>
                   <div style={{ fontSize: 18, color: BRAND.muted, transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "none" }}>›</div>
