@@ -11,6 +11,31 @@ const SG_TYPE = {
   cfb: 'ncaa_football',
 };
 
+const SG_CLIENT_ID = process.env.NEXT_PUBLIC_SEATGEEK_CLIENT_ID;
+
+// Fetch price + direct URL for a specific game
+export async function fetchSGGameInfo(homeTeam, awayTeam, dateISO) {
+  if (!SG_CLIENT_ID) return null;
+  try {
+    const date = dateISO.split("T")[0];
+    const next = new Date(date);
+    next.setDate(next.getDate() + 1);
+    const nextDate = next.toISOString().slice(0, 10);
+    const q = encodeURIComponent(`${homeTeam} ${awayTeam}`);
+    const url = `https://api.seatgeek.com/2/events?client_id=${SG_CLIENT_ID}` +
+      `&q=${q}&datetime_utc.gte=${date}T00:00:00&datetime_utc.lte=${nextDate}T00:00:00&per_page=5`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const events = data?.events ?? [];
+    if (!events.length) return null;
+    const ev = events[0];
+    const price = ev.stats?.lowest_price ? Math.floor(ev.stats.lowest_price) : null;
+    return { price, url: ev.url || null };
+  } catch {
+    return null;
+  }
+}
+
 // Returns a map of "YYYY-MM-DD" → lowest price (number) for the team's
 // upcoming events, so callers can match each scheduled game by date.
 export async function fetchTeamTicketPrices(teamName, league, clientId) {

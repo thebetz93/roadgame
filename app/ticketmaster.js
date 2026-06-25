@@ -26,6 +26,32 @@ const OFFICIAL_TEAMS = {
   nhl: ["Anaheim Ducks","Boston Bruins","Buffalo Sabres","Calgary Flames","Carolina Hurricanes","Chicago Blackhawks","Colorado Avalanche","Columbus Blue Jackets","Dallas Stars","Detroit Red Wings","Edmonton Oilers","Florida Panthers","Los Angeles Kings","Minnesota Wild","Montreal Canadiens","Nashville Predators","New Jersey Devils","New York Islanders","New York Rangers","Ottawa Senators","Philadelphia Flyers","Pittsburgh Penguins","San Jose Sharks","Seattle Kraken","St. Louis Blues","Tampa Bay Lightning","Toronto Maple Leafs","Utah Mammoth","Vancouver Canucks","Vegas Golden Knights","Washington Capitals","Winnipeg Jets"],
 };
 
+// Fetch price + direct URL for a specific game
+export async function fetchTMGameInfo(homeTeam, awayTeam, dateISO) {
+  if (!API_KEY) return null;
+  try {
+    const date = dateISO.split("T")[0];
+    const kw = encodeURIComponent(`${homeTeam} ${awayTeam}`);
+    const url = `${BASE_URL}/events.json?apikey=${API_KEY}` +
+      `&keyword=${kw}&startDateTime=${date}T00:00:00Z&endDateTime=${date}T23:59:59Z` +
+      `&classificationName=sports&size=5&countryCode=US`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const events = data?._embedded?.events ?? [];
+    for (const ev of events) {
+      const name = (ev.name || "").toLowerCase();
+      if (NON_GAME_KEYWORDS.some(k => name.includes(k))) continue;
+      const price = ev.priceRanges?.length
+        ? Math.floor(Math.min(...ev.priceRanges.map(r => r.min).filter(Boolean)))
+        : null;
+      return { price: price > 0 ? price : null, url: ev.url || null };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchTeamSchedule(teamName, league) {
   if (!API_KEY) {
     console.warn("No Ticketmaster API key set — using demo data");

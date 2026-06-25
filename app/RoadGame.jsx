@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchTeamSchedule } from "./espn";
-import { fetchTeamTicketPrices } from "./seatgeek";
+import { fetchTeamTicketPrices, fetchSGGameInfo } from "./seatgeek";
+import { fetchTMGameInfo } from "./ticketmaster";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
@@ -1805,11 +1806,14 @@ function spotheroUrl(venue, city) {
 }
 
 function GamePlanContent({ game, tier, userCity }) {
-  const teamQ = encodeURIComponent(game.home);
+  const matchup = `${game.home} vs ${game.away}`;
+  const date = game.dateISO.split('T')[0];
+  const gameQ = encodeURIComponent(matchup);
   const cityName = game.city.split(",")[0];
   const mapsDir = `https://www.google.com/maps/dir/${encodeURIComponent(userCity || "")}/${encodeURIComponent(game.venue + ", " + game.city)}`;
   const hotelUrl = expediaAffiliate(`https://www.expedia.com/Hotel-Search?destination=${encodeURIComponent(game.city)}&term=${encodeURIComponent("hotels near " + game.venue)}`);
-  const ticketUrl = `https://seatgeek.com/search?q=${teamQ}`;
+  const sgSlug = game.home.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const ticketUrl = `https://seatgeek.com/${sgSlug}-tickets`;
   const guide = guideFor(game.city);
 
   const PlanRow = ({ emoji, label, sublabel, href, cta = "VIEW →" }) => (
@@ -1986,8 +1990,16 @@ function AlertCard({ alert: a, onTap, urgent }) {
 
 function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) {
   const matchup = game.isHome ? `${activeTeam.team} vs ${game.away}` : `${game.home} vs ${activeTeam.team}`;
-  const query = encodeURIComponent(`${matchup} ${game.city}`);
   const guide = guideFor(game.city);
+  const [tmInfo, setTmInfo] = useState(null);
+  const [sgInfo, setSgInfo] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTMGameInfo(game.home, game.away, game.dateISO).then(info => { if (!cancelled) setTmInfo(info); });
+    fetchSGGameInfo(game.home, game.away, game.dateISO).then(info => { if (!cancelled) setSgInfo(info); });
+    return () => { cancelled = true; };
+  }, [game.id]);
 
   return (
     <div style={{
@@ -2014,15 +2026,22 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
       </div>
 
       {travelTab === "tickets" && (() => {
-        const teamQ = encodeURIComponent(activeTeam.team);
-        // SeatGeek uses hash-based routing for search, so use the stable performer page URL instead
+        const date = game.dateISO.split('T')[0];
+        const gameQ = encodeURIComponent(matchup);
         const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const sgUrl = `https://seatgeek.com/${sgSlug}-tickets${SEATGEEK_CLIENT_ID ? `?client_id=${SEATGEEK_CLIENT_ID}` : ''}`;
         const vendors = [
-          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49", url: sgUrl, highlight: !!SEATGEEK_CLIENT_ID },
-          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", url: `https://www.ticketmaster.com/search?q=${teamQ}` },
-          { name: "StubHub", desc: "Resale guarantee", color: "#3B1869", url: `https://www.stubhub.com/secure/search?q=${teamQ}` },
-          { name: "Vivid Seats", desc: "Rewards program", color: "#231F20", url: `https://www.vividseats.com/search?searchTerm=${teamQ}` },
+          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49",
+            url: sgInfo?.url || `https://seatgeek.com/${sgSlug}-tickets`,
+            price: sgInfo?.price ?? game.ticketsFrom ?? null },
+          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF",
+            url: tmInfo?.url || `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}`,
+            price: tmInfo?.price || null },
+          { name: "Vivid Seats", desc: "Rewards program", color: "#7B2D8B",
+            url: `https://www.vividseats.com/search?searchTerm=${gameQ}` },
+          { name: "Gametime", desc: "Last-minute deals", color: "#00A86B",
+            url: `https://gametime.co/search?q=${gameQ}` },
+          { name: "TickPick", desc: "No fees · Best price", color: "#1A3A6B",
+            url: `https://www.tickpick.com/search?q=${gameQ}` },
         ];
         const [sg, ...rest] = vendors;
         return (
@@ -2046,7 +2065,9 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
                     <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream }}>{sg.name}</div>
                     <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, background: BRAND.green, color: BRAND.charcoal, borderRadius: 4, padding: "2px 6px" }}>BEST PICK</div>
                   </div>
-                  <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>Deal Score rated · Best prices guaranteed</div>
+                  <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>
+                    {sg.price ? `From $${sg.price} · Deal Score rated` : "Deal Score rated · Best prices guaranteed"}
+                  </div>
                 </div>
               </div>
               <div className="oswald" style={{ fontSize: 12, color: BRAND.green, fontWeight: 700, letterSpacing: 1, whiteSpace: "nowrap" }}>GET TICKETS →</div>
@@ -2066,7 +2087,9 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity }) 
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{v.name}</div>
-                    <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{v.desc}</div>
+                    <div style={{ fontSize: 10, color: v.price ? BRAND.green : BRAND.muted, fontWeight: 500 }}>
+                      {v.price ? `From $${v.price}` : v.desc}
+                    </div>
                   </div>
                 </div>
                 <div className="oswald" style={{ fontSize: 11, color: BRAND.muted, fontWeight: 700, letterSpacing: 1 }}>GET TICKETS →</div>
