@@ -66,6 +66,7 @@ const storage = {
 
 // ─── HAVERSINE ────────────────────────────────────────────────────────────────
 function haversine(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
   const R = 3959;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -273,12 +274,14 @@ function relInfo(iso) {
   return { text, soon: days <= 7 };
 }
 function travelTier(d) {
+  if (d == null) return { label: "AWAY", color: BRAND.muted, bg: "rgba(154,165,173,0.12)" };
   if (d < 100) return { label: "LOCAL", color: BRAND.green, bg: BRAND.greenGlow };
   if (d < 400) return { label: "ROAD TRIP", color: BRAND.amber, bg: "rgba(242,165,56,0.15)" };
   if (d < 900) return { label: "LONG HAUL", color: "#E87A3A", bg: "rgba(232,122,58,0.15)" };
   return { label: "FLY", color: "#9BB4E8", bg: "rgba(155,180,232,0.15)" };
 }
 function modesFor(d) {
+  if (d == null) return [];
   if (d < 80) return ["drive"];
   if (d < 450) return ["drive", "train"];
   return ["fly", "drive"];
@@ -711,8 +714,8 @@ const [schedule, setSchedule] = useState([]);
     return () => { cancelled = true; };
   }, [activeTeam, userLat, userLng]);
 
-  const visibleSchedule = useMemo(() => nearbyOnly ? schedule.filter(g => g.dist <= maxDist) : schedule, [schedule, nearbyOnly, maxDist]);
-  const reachableCount = schedule.filter(g => g.dist <= maxDist).length;
+  const visibleSchedule = useMemo(() => nearbyOnly ? schedule.filter(g => g.dist != null && g.dist <= maxDist) : schedule, [schedule, nearbyOnly, maxDist]);
+  const reachableCount = schedule.filter(g => g.dist != null && g.dist <= maxDist).length;
   const leagueMeta = LEAGUES.find(l => l.id === (activeTeam?.league || activeLeague));
 
   const [alerts, setAlerts] = useState([]);
@@ -1738,7 +1741,7 @@ const [schedule, setSchedule] = useState([]);
           <div style={{ display: "flex", gap: 7, marginBottom: 12 }}>
             <Stat value={schedule.length} label="GAMES" />
             <Stat value={reachableCount} label={`WITHIN ${maxDist}MI`} accent={BRAND.green} />
-            <Stat value={schedule.length > 0 ? `${Math.min(...schedule.map(g => g.dist))}MI` : "—"} label="NEAREST" accent={BRAND.amber} />
+            <Stat value={(() => { const d = schedule.filter(g => g.dist != null); return d.length ? `${Math.min(...d.map(g => g.dist))}MI` : "—"; })()} label="NEAREST" accent={BRAND.amber} />
           </div>
 
           <div style={{
@@ -1842,7 +1845,7 @@ const [schedule, setSchedule] = useState([]);
           {visibleSchedule.map(game => {
             const tier = travelTier(game.dist);
             const isExpanded = expanded === game.id;
-            const reachable = game.dist <= maxDist;
+            const reachable = game.dist != null && game.dist <= maxDist;
             const rel = relInfo(game.dateISO);
             return (
               <div key={game.id} style={{ marginBottom: isExpanded ? 0 : 7, opacity: reachable ? 1 : 0.4 }}>
@@ -1881,7 +1884,7 @@ const [schedule, setSchedule] = useState([]);
                     </div>
                     <div style={{ flexShrink: 0, textAlign: "right" }}>
                       <div className="oswald" style={{ background: tier.bg, color: tier.color, borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{tier.label}</div>
-                      <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{game.dist} mi</div>
+                      <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>{game.dist != null ? `${game.dist} mi` : "—"}</div>
                       {game.ticketsFrom != null && <div className="oswald" style={{ fontSize: 14, fontWeight: 700, color: BRAND.green, letterSpacing: 0.3 }}>${game.ticketsFrom}+</div>}
                     </div>
                   </div>
@@ -2302,7 +2305,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
             <div style={{ fontSize: 22, marginBottom: 4 }}>●</div>
             <div className="oswald" style={{ fontSize: 14, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.2 }}>{game.venue.toUpperCase()}</div>
             <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500 }}>{game.city}</div>
-            <div className="oswald" style={{ fontSize: 11, color: BRAND.green, marginTop: 5, fontWeight: 700, letterSpacing: 1 }}>{game.dist} MILES FROM {userCity.toUpperCase()}</div>
+            {game.dist != null && <div className="oswald" style={{ fontSize: 11, color: BRAND.green, marginTop: 5, fontWeight: 700, letterSpacing: 1 }}>{game.dist} MILES FROM {userCity.toUpperCase()}</div>}
           </div>
           <a href={`https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.venue + " " + game.city)}`}
             target="_blank" rel="noopener noreferrer" className="oswald"

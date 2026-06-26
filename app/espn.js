@@ -142,6 +142,11 @@ function parseEvent(event, ourTeam) {
     ? `${v.address.city}, ${v.address.state}`
     : v?.address?.city || venueData?.c || 'TBD';
 
+  // Use our VENUES table for lat/lng; fall back to ESPN's own venue coordinates
+  // for schools we don't have (away games at non-major opponents, etc.)
+  const espnLat = v?.location?.latitude != null ? parseFloat(v.location.latitude) : null;
+  const espnLng = v?.location?.longitude != null ? parseFloat(v.location.longitude) : null;
+
   return {
     id: `espn-${event.id}`,
     home: homeApi || homeKey,
@@ -150,8 +155,8 @@ function parseEvent(event, ourTeam) {
     dateISO,
     venue: v?.fullName || venueData?.v || 'TBD',
     city,
-    lat: venueData?.lat ?? null,
-    lng: venueData?.lng ?? null,
+    lat: venueData?.lat ?? espnLat,
+    lng: venueData?.lng ?? espnLng,
     ticketsFrom: null,
     realData: true,
   };
