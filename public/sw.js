@@ -6,8 +6,10 @@ self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+self.addEventListener("activate", () => {
+  // No clients.claim() — claiming existing clients on iOS Safari can force
+  // a page reload which fails when the HTML isn't cached, causing
+  // "This page couldn't load". Pages pick up the new SW on next navigation.
 });
 
 // Push notifications (used later when the server sends pushes).
