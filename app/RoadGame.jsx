@@ -219,8 +219,8 @@ function leagueInSeason(id) {
   const m = new Date().getMonth(); // 0=Jan … 11=Dec
   if (id === "nfl") return m >= 8 || m <= 1;   // Sep–Feb
   if (id === "mlb") return m >= 2 && m <= 9;   // Mar–Oct
-  if (id === "nba") return m >= 9 || m <= 5;   // Oct–Jun
-  if (id === "nhl") return m >= 9 || m <= 5;   // Oct–Jun
+  if (id === "nba") return m >= 9 || m <= 4;   // Oct–May (playoffs end before June)
+  if (id === "nhl") return m >= 9 || m <= 4;   // Oct–May (Stanley Cup by end of May)
   if (id === "cfb") return m >= 7 || m <= 0;   // Aug–Jan
   return false;
 }
