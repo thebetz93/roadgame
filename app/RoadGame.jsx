@@ -212,6 +212,26 @@ const LEAGUES = [
   { id: "cfb", name: "CFB", emoji: "🏈", season: "Aug–Jan" },
 ];
 
+// US popularity ranking — lower = more popular (tiebreaker when 2+ leagues are in-season)
+const LEAGUE_POPULARITY = { nfl: 1, mlb: 2, cfb: 3, nhl: 4, nba: 5 };
+
+function leagueInSeason(id) {
+  const m = new Date().getMonth(); // 0=Jan … 11=Dec
+  if (id === "nfl") return m >= 8 || m <= 1;   // Sep–Feb
+  if (id === "mlb") return m >= 2 && m <= 9;   // Mar–Oct
+  if (id === "nba") return m >= 9 || m <= 5;   // Oct–Jun
+  if (id === "nhl") return m >= 9 || m <= 5;   // Oct–Jun
+  if (id === "cfb") return m >= 7 || m <= 0;   // Aug–Jan
+  return false;
+}
+
+const SORTED_LEAGUES = [...LEAGUES].sort((a, b) => {
+  const aIn = leagueInSeason(a.id) ? 0 : 1;
+  const bIn = leagueInSeason(b.id) ? 0 : 1;
+  if (aIn !== bIn) return aIn - bIn;
+  return (LEAGUE_POPULARITY[a.id] ?? 99) - (LEAGUE_POPULARITY[b.id] ?? 99);
+});
+
 const TEAMS_BY_LEAGUE = {
   nfl: ["Arizona Cardinals","Atlanta Falcons","Baltimore Ravens","Buffalo Bills","Carolina Panthers","Chicago Bears","Cincinnati Bengals","Cleveland Browns","Dallas Cowboys","Denver Broncos","Detroit Lions","Green Bay Packers","Houston Texans","Indianapolis Colts","Jacksonville Jaguars","Kansas City Chiefs","Las Vegas Raiders","Los Angeles Chargers","Los Angeles Rams","Miami Dolphins","Minnesota Vikings","New England Patriots","New Orleans Saints","New York Giants","New York Jets","Philadelphia Eagles","Pittsburgh Steelers","San Francisco 49ers","Seattle Seahawks","Tampa Bay Buccaneers","Tennessee Titans","Washington Commanders"],
   nba: ["Atlanta Hawks","Boston Celtics","Brooklyn Nets","Charlotte Hornets","Chicago Bulls","Cleveland Cavaliers","Dallas Mavericks","Denver Nuggets","Detroit Pistons","Golden State Warriors","Houston Rockets","Indiana Pacers","LA Clippers","Los Angeles Lakers","Memphis Grizzlies","Miami Heat","Milwaukee Bucks","Minnesota Timberwolves","New Orleans Pelicans","New York Knicks","Oklahoma City Thunder","Orlando Magic","Philadelphia 76ers","Phoenix Suns","Portland Trail Blazers","Sacramento Kings","San Antonio Spurs","Toronto Raptors","Utah Jazz","Washington Wizards"],
@@ -360,7 +380,7 @@ export default function RoadGame() {
   const [authOpen, setAuthOpen] = useState(false);
 
   const [view, setView] = useState("following");
-  const [activeLeague, setActiveLeague] = useState("nfl");
+  const [activeLeague, setActiveLeague] = useState(SORTED_LEAGUES[0].id);
   const [search, setSearch] = useState("");
   const [following, setFollowing] = useState([]);
   const [activeTeam, setActiveTeam] = useState(null);
@@ -1511,7 +1531,7 @@ const [schedule, setSchedule] = useState([]);
           <div style={{ fontSize: 11, color: BRAND.muted, marginBottom: 14, fontWeight: 500 }}>5 leagues · 130+ teams</div>
 
           <div style={{ display: "flex", gap: 5, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
-            {LEAGUES.map(l => (
+            {SORTED_LEAGUES.map(l => (
               <button key={l.id} onClick={() => setActiveLeague(l.id)} className="oswald" style={{
                 padding: "8px 14px", borderRadius: 8, border: "none", cursor: "pointer",
                 background: activeLeague === l.id ? BRAND.green : BRAND.slateLight,
