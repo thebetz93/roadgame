@@ -38,7 +38,7 @@ const ABBR = {
   "Toronto Raptors":"tor","Utah Jazz":"utah","Washington Wizards":"wsh",
   // MLB
   "Arizona Diamondbacks":"ari","Atlanta Braves":"atl","Baltimore Orioles":"bal",
-  "Boston Red Sox":"bos","Chicago Cubs":"chc","Chicago White Sox":"cws",
+  "Boston Red Sox":"bos","Chicago Cubs":"chc","Chicago White Sox":"chw",
   "Cincinnati Reds":"cin","Cleveland Guardians":"cle","Colorado Rockies":"col",
   "Detroit Tigers":"det","Houston Astros":"hou","Kansas City Royals":"kc",
   "Los Angeles Angels":"laa","Los Angeles Dodgers":"lad","Miami Marlins":"mia",
