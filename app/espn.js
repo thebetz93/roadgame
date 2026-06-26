@@ -128,14 +128,14 @@ function parseEvent(event, ourTeam) {
   const homeApi = homeComp.team?.displayName;
   const awayApi  = awayComp.team?.displayName;
 
+  // resolveVenueKey is only for lat/lng — never use it as the team display name.
+  // "Louisville Cardinals" → resolves to "Arizona Cardinals" in VENUES, which would
+  // make CFB games appear as NFL games. Use the raw ESPN displayName for home/away.
   const homeKey = resolveVenueKey(homeApi);
-  // Don't drop the game if the home team isn't in VENUES (common for CFB non-major opponents)
-  // Fall back to ESPN's own venue fields which include city/name for all games
   const venueData = homeKey ? VENUES[homeKey] : null;
 
   const nick = ourTeam.split(' ').pop().toLowerCase();
   const isHome = (homeApi || '').toLowerCase().includes(nick);
-  const awayKey = resolveVenueKey(awayApi) || awayApi;
 
   const v = comp.venue;
   const city = v?.address?.city && v?.address?.state
@@ -144,8 +144,8 @@ function parseEvent(event, ourTeam) {
 
   return {
     id: `espn-${event.id}`,
-    home: homeKey || homeApi,
-    away: awayKey,
+    home: homeApi || homeKey,
+    away: awayApi,
     isHome,
     dateISO,
     venue: v?.fullName || venueData?.v || 'TBD',
