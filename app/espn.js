@@ -162,7 +162,7 @@ export async function fetchTeamSchedule(teamName, league) {
   const abbr = ABBR[teamName];
   if (!path || !abbr) {
     console.warn(`[ESPN] no mapping for "${teamName}" (${league})`);
-    return fetchFallback(teamName, league);
+    return [];
   }
 
   const yr = season(league);
@@ -209,21 +209,5 @@ export async function fetchTeamSchedule(teamName, league) {
     }
   }
 
-  return fetchFallback(teamName, league);
-}
-
-async function fetchFallback(teamName, league) {
-  if (!["nfl", "nba", "mlb", "nhl", "cfb"].includes(league)) return [];
-  console.log(`[Fallback] trying schedule-fallback for "${teamName}" (${league})`);
-  try {
-    const res = await fetch(
-      `/api/schedule-fallback?team=${encodeURIComponent(teamName)}&league=${league}`
-    );
-    if (!res.ok) return null;   // network/server error → show error card
-    const games = await res.json();
-    console.log(`[Fallback] ${games.length} games returned`);
-    return games;               // [] is valid (no listings yet), not an error
-  } catch {
-    return null;                // true fetch failure → show error card
-  }
+  return [];
 }
