@@ -702,18 +702,7 @@ const [schedule, setSchedule] = useState([]);
           ticketsFrom: g.ticketsFrom ?? priceMap[g.dateISO?.slice(0, 10)] ?? null,
         }));
         setSchedule(enriched);
-      } else if (activeTeam.league === "cfb") {
-        // No live CFB data yet (offseason / tickets not on Ticketmaster yet).
-        // Use estimated schedule: real venues + approximate dates, wrong opponents.
-        const estimated = generateSchedule(activeTeam.team, activeTeam.league).map(g => ({
-          ...g,
-          dist: haversine(userLat, userLng, g.lat, g.lng),
-          ticketsFrom: null,
-          realData: false,
-        }));
-        setSchedule(estimated);
       } else {
-        // Non-CFB with no upcoming games (end of season)
         setSchedule([]);
       }
       setScheduleLoading(false);
@@ -749,11 +738,6 @@ const [schedule, setSchedule] = useState([]);
     Promise.all(
       teams.map(async team => {
         let games = await fetchTeamSchedule(team, activeLeague);
-        // CFB: fall back to estimated schedule (real venues, approximate dates) when
-        // no live data is available yet (offseason / tickets not yet on sale)
-        if ((!games || games.length === 0) && activeLeague === "cfb") {
-          games = generateSchedule(team, activeLeague);
-        }
         if (!games || games.length === 0) return { team, closest: null };
         const nearby = games
           .filter(g => g.lat && g.lng && new Date(g.dateISO) > now)
@@ -1560,7 +1544,11 @@ const [schedule, setSchedule] = useState([]);
                   <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{team}</div>
                   {venue && (
                     <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>
-                      {venue.c}{browseClosest ? ` • Closest Game: ${browseClosest.city.split(",")[0]} - ${browseClosest.dist}m` : dist !== null ? ` • ${dist}m` : ""}
+                      {venue.c}{!browseLeagueGames[activeLeague]
+                        ? <span style={{ opacity: 0.35 }}> • …</span>
+                        : browseClosest
+                          ? ` • Closest Game: ${browseClosest.city.split(",")[0]} - ${browseClosest.dist}m`
+                          : dist !== null ? ` • ${dist}m` : ""}
                     </div>
                   )}
                 </div>
