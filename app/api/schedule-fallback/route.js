@@ -157,7 +157,11 @@ async function fetchFromTicketmaster(team, league) {
     const nowDate = new Date();
     return events
       .map(ev => parseTMEvent(ev, team, league))
-      .filter(g => g !== null && new Date(g.dateISO) > nowDate)
+      .filter(g => {
+        if (!g || new Date(g.dateISO) <= nowDate) return false;
+        const opp = g.isHome ? g.away : g.home;
+        return opp && opp.toUpperCase() !== 'TBD';
+      })
       .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
   } catch {
     return [];
@@ -193,7 +197,11 @@ async function fetchFromApiSports(team, league) {
     const now = new Date();
     return (gamesJson.response || [])
       .map(g => parseApiSportsGame(g, team))
-      .filter(g => g !== null && new Date(g.dateISO) > now)
+      .filter(g => {
+        if (!g || new Date(g.dateISO) <= now) return false;
+        const opp = g.isHome ? g.away : g.home;
+        return opp && opp.toUpperCase() !== 'TBD';
+      })
       .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
   } catch {
     return [];
