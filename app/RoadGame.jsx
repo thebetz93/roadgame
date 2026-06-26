@@ -780,6 +780,7 @@ const [schedule, setSchedule] = useState([]);
   useEffect(() => {
     if (!user || !alertsEnabled) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (!("Notification" in window)) return;
     if (Notification.permission === "denied") return;
 
     setPushGranted(Notification.permission === "granted");
@@ -1452,7 +1453,7 @@ const [schedule, setSchedule] = useState([]);
                     {pushGranted ? "ON" : "OFF"}
                   </div>
                 </div>
-                {!pushGranted && Notification.permission !== "denied" && (
+                {!pushGranted && ("Notification" in window) && Notification.permission !== "denied" && (
                   <button onClick={async () => {
                     const perm = await Notification.requestPermission();
                     if (perm !== "granted") return;
@@ -1477,7 +1478,7 @@ const [schedule, setSchedule] = useState([]);
                     fontSize: 11, fontWeight: 700, letterSpacing: 1,
                   }}>ENABLE PUSH NOTIFICATIONS</button>
                 )}
-                {Notification.permission === "denied" && (
+                {("Notification" in window) && Notification.permission === "denied" && (
                   <div style={{ fontSize: 10, color: BRAND.red, marginTop: 8 }}>
                     Notifications blocked in browser settings — enable them to turn this on.
                   </div>
