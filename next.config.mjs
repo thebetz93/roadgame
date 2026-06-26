@@ -6,7 +6,8 @@ const nextConfig = {
         // Don't cache the HTML shell so the PWA always loads the latest
         // JS bundles after a Vercel deployment
         source: "/",
-        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
+        // no-cache: always revalidate, but serve stale if network fails (no must-revalidate)
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
       },
     ];
   },
