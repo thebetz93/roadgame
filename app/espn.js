@@ -166,10 +166,18 @@ export async function fetchTeamSchedule(teamName, league) {
   }
 
   const yr = season(league);
-  const urls = [
-    `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}`,
-    `${BASE}/${path}/teams/${abbr}/schedule`,            // no-season fallback
-  ];
+  // CFB: try seasontype=2 (regular season) as an extra pass — ESPN sometimes
+  // omits upcoming games from the default schedule endpoint until tickets go live.
+  const urls = league === 'cfb'
+    ? [
+        `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}`,
+        `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}&seasontype=2`,
+        `${BASE}/${path}/teams/${abbr}/schedule`,
+      ]
+    : [
+        `${BASE}/${path}/teams/${abbr}/schedule?season=${yr}`,
+        `${BASE}/${path}/teams/${abbr}/schedule`,
+      ];
 
   const now = new Date();
 
@@ -186,13 +194,16 @@ export async function fetchTeamSchedule(teamName, league) {
 
       const upcoming = events
         .map(e => parseEvent(e, teamName))
-        .filter(g => g !== null && new Date(g.dateISO) > now)
+        .filter(g => {
+          if (!g || new Date(g.dateISO) <= now) return false;
+          const opp = g.isHome ? g.away : g.home;
+          return opp && opp.toUpperCase() !== 'TBD';
+        })
         .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
 
       console.log(`[ESPN] ${upcoming.length} upcoming for ${teamName}`);
       if (upcoming.length > 0) return upcoming;
-      // Has events but all are past — don't try more ESPN URLs, go to fallback
-      break;
+      // All events were past or TBD — keep trying other URL variants
     } catch (err) {
       console.warn('[ESPN] error:', err);
     }
