@@ -1224,8 +1224,8 @@ const [schedule, setSchedule] = useState([]);
               color: accountMenuOpen ? BRAND.charcoal : BRAND.cream,
               fontSize: 12, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap",
             }}>
-              <span className="acct-full">Welcome, {user.name.split(" ")[0]}</span>
-              <span className="acct-initials">{user.name.split(" ").filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join("")}</span>
+              <span className="acct-full">Welcome, {(user.name || user.email || "").split(" ")[0]}</span>
+              <span className="acct-initials">{(user.name || user.email || "").split(" ").filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join("") || "?"}</span>
             </button>
           ) : (
             <button onClick={() => setAccountMenuOpen(o => !o)} className="oswald" style={{
@@ -1586,7 +1586,7 @@ const [schedule, setSchedule] = useState([]);
       {view === "following" && !activeTeam && (
         <div style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
-            {user ? `HEY, ${user.name.split(" ")[0].toUpperCase()}.` : "MY TEAMS"}
+            {user ? `HEY, ${(user.name || user.email || "").split(" ")[0].toUpperCase() || "THERE"}.` : "MY TEAMS"}
           </div>
           <div style={{ fontSize: 11, color: BRAND.muted, marginBottom: 14, fontWeight: 500 }}>
             {following.length > 0
