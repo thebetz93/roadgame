@@ -1985,6 +1985,46 @@ function Stat({ value, label, accent = BRAND.cream }) {
   );
 }
 
+// Real vendor logo loaded from a favicon/logo service in the user's browser.
+// Falls back through services, then to the original brand-color letter tile if
+// none resolve — so it degrades gracefully and never shows a broken image.
+function VendorLogo({ domain, name, color, size = 30 }) {
+  const [step, setStep] = useState(0);
+  const sources = [
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+  ];
+  const radius = size >= 36 ? 8 : 6;
+
+  if (step >= sources.length) {
+    return (
+      <div className="oswald" style={{
+        width: size, height: size, borderRadius: radius, background: color, color: "#fff",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: size >= 36 ? 14 : 12, fontWeight: 700, flexShrink: 0,
+      }}>{name[0]}</div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: radius, background: "#fff",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      overflow: "hidden", flexShrink: 0,
+    }}>
+      <img
+        src={sources[step]}
+        alt={`${name} logo`}
+        width={size - 8}
+        height={size - 8}
+        loading="lazy"
+        onError={() => setStep(s => s + 1)}
+        style={{ width: size - 8, height: size - 8, objectFit: "contain", display: "block" }}
+      />
+    </div>
+  );
+}
+
 function AlertCard({ alert: a, onTap, urgent }) {
   const tier = travelTier(a.dist);
   const rel = relInfo(a.dateISO);
@@ -2102,17 +2142,17 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
         const gameQ = encodeURIComponent(matchup);
         const sgSlug = activeTeam.team.toLowerCase().replace(/[.']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const vendors = [
-          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49",
+          { name: "SeatGeek", desc: "Deal Score rated", color: "#FF5B49", domain: "seatgeek.com",
             url: sgInfo?.url || `https://seatgeek.com/${sgSlug}-tickets`,
             price: sgInfo?.price ?? game.ticketsFrom ?? null },
-          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF",
+          { name: "Ticketmaster", desc: "Official primary", color: "#026CDF", domain: "ticketmaster.com",
             url: tmInfo?.url || `https://www.ticketmaster.com/search?q=${gameQ}&dateStart=${date}`,
             price: tmInfo?.price || null },
-          { name: "Vivid Seats", desc: "Rewards program", color: "#7B2D8B",
+          { name: "Vivid Seats", desc: "Rewards program", color: "#7B2D8B", domain: "vividseats.com",
             url: `https://www.vividseats.com/search?searchTerm=${gameQ}` },
-          { name: "Gametime", desc: "Last-minute deals", color: "#00A86B",
+          { name: "Gametime", desc: "Last-minute deals", color: "#00A86B", domain: "gametime.co",
             url: `https://gametime.co/search?q=${gameQ}` },
-          { name: "TickPick", desc: "No fees · Best price", color: "#1A3A6B",
+          { name: "TickPick", desc: "No fees · Best price", color: "#1A3A6B", domain: "tickpick.com",
             url: `https://www.tickpick.com/search?q=${gameQ}` },
         ];
         // Feature whichever vendor actually returns the lowest real price.
@@ -2141,7 +2181,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div className="oswald" style={{ width: 36, height: 36, borderRadius: 8, background: sg.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>{sg.name[0]}</div>
+                <VendorLogo domain={sg.domain} name={sg.name} color={sg.color} size={36} />
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream }}>{sg.name}</div>
@@ -2164,9 +2204,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div className="oswald" style={{ width: 30, height: 30, borderRadius: 6, background: v.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>
-                    {v.name[0]}
-                  </div>
+                  <VendorLogo domain={v.domain} name={v.name} color={v.color} size={30} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{v.name}</div>
                     <div style={{ fontSize: 10, color: v.price ? BRAND.green : BRAND.muted, fontWeight: 500 }}>
@@ -2272,7 +2310,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div className="oswald" style={{ width: 30, height: 30, borderRadius: 6, background: "#003580", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>E</div>
+                    <VendorLogo domain="expedia.com" name="Expedia" color="#1B3E94" size={30} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{label}</div>
                       <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>Expedia · Compare rates</div>
@@ -2290,7 +2328,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="oswald" style={{ width: 30, height: 30, borderRadius: 6, background: "#003580", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>B</div>
+                <VendorLogo domain="booking.com" name="Booking.com" color="#003580" size={30} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>Hotels Near {cityName}</div>
                   <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>Booking.com · Compare rates</div>
@@ -2306,7 +2344,7 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="oswald" style={{ width: 30, height: 30, borderRadius: 6, background: "#C8102E", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>H</div>
+                <VendorLogo domain="hotels.com" name="Hotels.com" color="#C8102E" size={30} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>Hotels Near {cityName}</div>
                   <div style={{ fontSize: 10, color: BRAND.muted, fontWeight: 500 }}>Hotels.com · Compare rates</div>
