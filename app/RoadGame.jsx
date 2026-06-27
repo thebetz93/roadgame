@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchTeamSchedule } from "./espn";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
@@ -400,6 +400,36 @@ export default function RoadGame() {
   const [browseLeagueGames, setBrowseLeagueGames] = useState({});
   const [browseLeagueLoading, setBrowseLeagueLoading] = useState(false);
   const [pushGranted, setPushGranted] = useState(false);
+  const navHydrated = useRef(false);
+
+  // Restore the last-visited tab / league / open team on refresh so a reload
+  // returns you to where you were instead of the default landing page. Read in
+  // an effect (not useState init) to avoid an SSR/hydration mismatch; the splash
+  // screen covers the brief restore. Auth-only views are reconciled below once
+  // we know whether anyone is signed in.
+  useEffect(() => {
+    try {
+      const nav = JSON.parse(localStorage.getItem('roadgame:nav') || '{}');
+      if (nav.view) setView(nav.view);
+      if (nav.activeLeague) setActiveLeague(nav.activeLeague);
+      if (nav.activeTeam) setActiveTeam(nav.activeTeam);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    // Skip the first run so we don't overwrite saved nav with the defaults
+    // before the restore effect has applied.
+    if (!navHydrated.current) { navHydrated.current = true; return; }
+    try {
+      localStorage.setItem('roadgame:nav', JSON.stringify({ view, activeLeague, activeTeam }));
+    } catch {}
+  }, [view, activeLeague, activeTeam]);
+
+  // Don't strand a signed-out visitor on an auth-only view after a refresh.
+  useEffect(() => {
+    if (loading) return;
+    if (!user && (view === 'profile' || view === 'alerts')) setView('following');
+  }, [loading, user, view]);
 
   useEffect(() => {
     const ua = navigator.userAgent;
