@@ -1319,7 +1319,7 @@ const [schedule, setSchedule] = useState([]);
       {!activeTeam && view !== "profile" && (
         <div style={{ display: "flex", gap: 4, padding: "10px 14px 0", maxWidth: 600, margin: "0 auto" }}>
           {[
-            ["following", "MY TEAMS"],
+            ["following", "FOLLOWING"],
             ["teams", "BROWSE TEAMS"],
           ].map(([id, lbl]) => (
             <button key={id} onClick={() => setView(id)} className="oswald" style={{
@@ -1597,11 +1597,11 @@ const [schedule, setSchedule] = useState([]);
         </div>
       )}
 
-      {/* ── MY TEAMS VIEW ── */}
+      {/* ── FOLLOWING VIEW ── */}
       {view === "following" && !activeTeam && (
         <div style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
-            {user ? `HEY, ${(user.name || user.email || "").split(" ")[0].toUpperCase() || "THERE"}.` : "MY TEAMS"}
+            {user ? `HEY, ${(user.name || user.email || "").split(" ")[0].toUpperCase() || "THERE"}.` : "FOLLOWING"}
           </div>
           <div style={{ fontSize: 11, color: BRAND.muted, marginBottom: 14, fontWeight: 500 }}>
             {following.length > 0
@@ -1631,7 +1631,18 @@ const [schedule, setSchedule] = useState([]);
             <div style={{ textAlign: "center", padding: 36, color: BRAND.muted, fontSize: 13 }}>
               No teams yet — tap Browse Teams to add some.
             </div>
-          ) : following.map((f, i) => {
+          ) : [...following].sort((a, b) => {
+            // Teams with game alerts float to the top: this-week games first,
+            // then any nearby games, then teams with none. Stable sort keeps
+            // the original follow order within each group.
+            const rank = f => {
+              const ta = alerts.filter(x => x.team === f.team && x.league === f.league);
+              if (ta.some(x => x.isWeek)) return 0;
+              if (ta.length > 0) return 1;
+              return 2;
+            };
+            return rank(a) - rank(b);
+          }).map(f => {
             const meta = LEAGUES.find(l => l.id === f.league);
             const isOpen = expandedFollowTeam === `${f.team}-${f.league}`;
             const teamAlerts = alerts
@@ -1639,7 +1650,7 @@ const [schedule, setSchedule] = useState([]);
               .sort((a, b) => a.dist - b.dist);
             const urgentCount = teamAlerts.filter(a => a.isWeek).length;
             return (
-              <div key={i} style={{ marginBottom: 8 }}>
+              <div key={`${f.team}-${f.league}`} style={{ marginBottom: 8 }}>
                 {/* Team header row */}
                 <div onClick={() => setExpandedFollowTeam(isOpen ? null : `${f.team}-${f.league}`)}
                   style={{
