@@ -2099,7 +2099,17 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
           { name: "TickPick", desc: "No fees · Best price", color: "#1A3A6B",
             url: `https://www.tickpick.com/search?q=${gameQ}` },
         ];
-        const [sg, ...rest] = vendors;
+        // Feature whichever vendor actually returns the lowest real price.
+        // SeatGeek's lowest_price is gated (often null), while Ticketmaster's
+        // priceRanges work on a standard key — so don't hard-feature SeatGeek
+        // when a cheaper, real number is available elsewhere. Falls back to
+        // SeatGeek (deal-score deep link) when no source has a price.
+        const priced = vendors.filter(v => v.price != null);
+        const featured = priced.length
+          ? priced.reduce((lo, v) => (v.price < lo.price ? v : lo))
+          : vendors[0];
+        const sg = featured;
+        const rest = vendors.filter(v => v !== featured);
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ background: BRAND.slateLight, borderRadius: 8, padding: "8px 12px", marginBottom: 2 }}>
@@ -2115,14 +2125,14 @@ function ExpandedPanel({ game, activeTeam, travelTab, setTravelTab, userCity, sh
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div className="oswald" style={{ width: 36, height: 36, borderRadius: 8, background: sg.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>S</div>
+                <div className="oswald" style={{ width: 36, height: 36, borderRadius: 8, background: sg.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>{sg.name[0]}</div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.cream }}>{sg.name}</div>
                     <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, background: BRAND.green, color: BRAND.charcoal, borderRadius: 4, padding: "2px 6px" }}>BEST PICK</div>
                   </div>
                   <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>
-                    {sg.price ? `From $${sg.price} · Deal Score rated` : "Deal Score rated · Best prices guaranteed"}
+                    {sg.price ? `From $${sg.price} · ${sg.desc}` : "Deal Score rated · Best prices guaranteed"}
                   </div>
                 </div>
               </div>
