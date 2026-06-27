@@ -240,39 +240,6 @@ const TEAMS_BY_LEAGUE = {
   cfb: ["Alabama Crimson Tide","Arkansas Razorbacks","Auburn Tigers","Florida Gators","Georgia Bulldogs","Kentucky Wildcats","LSU Tigers","Mississippi State Bulldogs","Missouri Tigers","Oklahoma Sooners","Ole Miss Rebels","South Carolina Gamecocks","Tennessee Volunteers","Texas Longhorns","Texas A&M Aggies","Vanderbilt Commodores","Illinois Fighting Illini","Indiana Hoosiers","Iowa Hawkeyes","Maryland Terrapins","Michigan Wolverines","Michigan State Spartans","Minnesota Golden Gophers","Nebraska Cornhuskers","Northwestern Wildcats","Ohio State Buckeyes","Penn State Nittany Lions","Purdue Boilermakers","Rutgers Scarlet Knights","Wisconsin Badgers","UCLA Bruins","USC Trojans","Oregon Ducks","Washington Huskies","Arizona Wildcats","Arizona State Sun Devils","Baylor Bears","BYU Cougars","Cincinnati Bearcats","Colorado Buffaloes","Houston Cougars","Iowa State Cyclones","Kansas Jayhawks","Kansas State Wildcats","Oklahoma State Cowboys","TCU Horned Frogs","Texas Tech Red Raiders","UCF Knights","Utah Utes","West Virginia Mountaineers","Boston College Eagles","Clemson Tigers","Duke Blue Devils","Florida State Seminoles","Georgia Tech Yellow Jackets","Louisville Cardinals","Miami Hurricanes","NC State Wolfpack","North Carolina Tar Heels","Notre Dame Fighting Irish","Pittsburgh Panthers","Syracuse Orange","Virginia Cavaliers","Virginia Tech Hokies","Wake Forest Demon Deacons","Stanford Cardinal","California Golden Bears"],
 };
 
-function generateSchedule(team, league) {
-  const teams = TEAMS_BY_LEAGUE[league].filter(t => t !== team);
-  const meta = {
-    nfl:    { games: 17, startMonth: 8, startDay: 7,  dayInterval: 7,   defaultTime: "13:00" },
-    nba:    { games: 25, startMonth: 4, startDay: 17, dayInterval: 3,   defaultTime: "19:30" },
-    mlb:    { games: 25, startMonth: 4, startDay: 17, dayInterval: 2,   defaultTime: "19:05" },
-    nhl:    { games: 22, startMonth: 4, startDay: 17, dayInterval: 3,   defaultTime: "19:00" },
-    cfb:    { games: 7,  startMonth: 8, startDay: 1,  dayInterval: 7,   defaultTime: "12:00" },
-  }[league];
-  const games = [];
-  let day = new Date(2026, meta.startMonth, meta.startDay);
-  let seed = team.length;
-  for (let i = 0; i < meta.games; i++) {
-    seed = (seed * 9301 + 49297) % 233280;
-    const opp = teams[seed % teams.length];
-    const isHome = (seed >> 4) % 2 === 0;
-    const home = isHome ? team : opp;
-    const away = isHome ? opp : team;
-    const venue = VENUES[home];
-    if (!venue) { day = new Date(day.getTime() + meta.dayInterval * 86400000); continue; }
-    const [hh, mm] = meta.defaultTime.split(":");
-    const gameDate = new Date(day);
-    gameDate.setHours(parseInt(hh), parseInt(mm), 0, 0);
-    games.push({
-      id: `${league}-${team}-${i}`, home, away, isHome,
-      dateISO: gameDate.toISOString(),
-      venue: venue.v, city: venue.c, lat: venue.lat, lng: venue.lng,
-    });
-    day = new Date(day.getTime() + meta.dayInterval * 86400000);
-  }
-  return games;
-}
-
 function fmtDate(iso) { return new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function fmtTime(iso) { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
 // Human-friendly relative date, e.g. "Today", "Tomorrow", "This Sat", "In 3 wks".
@@ -837,10 +804,14 @@ const [schedule, setSchedule] = useState([]);
           applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
         });
 
+        const { data: { session } } = await supabase.auth.getSession();
         await fetch("/api/push/subscribe", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id, subscription: sub.toJSON() }),
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ subscription: sub.toJSON() }),
         });
       } catch {}
     }
@@ -983,7 +954,6 @@ const [schedule, setSchedule] = useState([]);
       overflowX: "hidden",
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
         input[type=range] { height: 4px; accent-color: ${BRAND.green}; }
         .oswald { font-family: 'Oswald', sans-serif; }
@@ -1501,10 +1471,14 @@ const [schedule, setSchedule] = useState([]);
                         userVisibleOnly: true,
                         applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
                       });
+                      const { data: { session } } = await supabase.auth.getSession();
                       await fetch("/api/push/subscribe", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userId: user.id, subscription: sub.toJSON() }),
+                        headers: {
+                          "Content-Type": "application/json",
+                          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+                        },
+                        body: JSON.stringify({ subscription: sub.toJSON() }),
                       });
                       showToast("Push notifications enabled!");
                     } catch {}
@@ -1877,21 +1851,6 @@ const [schedule, setSchedule] = useState([]);
               </div>
             </div>
           )}
-          {schedule.length > 0 && schedule[0]?.realData === false && (
-            <div style={{
-              background: "rgba(245,197,66,0.08)",
-              border: "1px solid rgba(245,197,66,0.3)",
-              borderRadius: 8, padding: "8px 12px", marginBottom: 10,
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <span style={{ fontSize: 14 }}>⚠️</span>
-              <div style={{ fontSize: 11, color: BRAND.amber, fontWeight: 500, lineHeight: 1.4 }}>
-                <strong>Estimated schedule</strong> — real opponents &amp; dates not confirmed yet.
-                Venues and distances are accurate. Check back closer to the season.
-              </div>
-            </div>
-          )}
-
           {visibleSchedule.map(game => {
             const tier = travelTier(game.dist);
             const isExpanded = expanded === game.id;

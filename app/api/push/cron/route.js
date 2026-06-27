@@ -10,8 +10,11 @@ function getSupabase() {
 
 // Called daily by Vercel Cron at 10:00 UTC (see vercel.json)
 export async function GET(req) {
+  // Fail closed: if no secret is configured, reject everything rather than
+  // accepting a literal "Bearer undefined".
+  const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
