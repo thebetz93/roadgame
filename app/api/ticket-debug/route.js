@@ -89,7 +89,31 @@ export async function GET(request) {
 
   const [tm, sg] = await Promise.all([tmLookup(home, day), sgLookup(home, day)]);
 
+  // Plain-English verdict so it can be read at a glance on mobile.
+  let summary;
+  const tmPriced = tm.ok && (tm.matches || []).find(m => m.hasPriceRanges && m.lowest > 0);
+  if (!TM_KEY && !SG_ID) {
+    summary = "NO KEYS in the deployed build. Add env vars in Vercel and REDEPLOY (env changes don't apply to existing deployments).";
+  } else if (tmPriced) {
+    summary = `WORKING: Ticketmaster returned a real price ($${tmPriced.lowest}) for "${tmPriced.name}". If the app still shows no price, it's a front-end display issue, not the data.`;
+  } else if (tm.ok && tm.matchesOnDay > 0) {
+    summary = `Ticketmaster FOUND the game but returned no price ranges for it. TM simply isn't publishing a price for this event — try another date/team.`;
+  } else if (tm.ok && tm.totalReturned > 0) {
+    summary = `Ticketmaster returned events but NONE matched ${home} on ${day} — a name/date matching gap. Try a date you know has a home game.`;
+  } else if (tm.ok) {
+    summary = `Ticketmaster returned ZERO events for "${home}" around ${day}. Likely no home game that day, or keyword mismatch.`;
+  } else {
+    summary = `Ticketmaster lookup FAILED: ${tm.reason}. If it says "no key", the deployed build predates the env vars — redeploy.`;
+  }
+  const sgNote = !SG_ID
+    ? "SeatGeek: no client_id in build."
+    : (sg.ok && (sg.matches || []).some(m => m.lowestPrice != null))
+      ? "SeatGeek: returning prices (affiliate scope active)."
+      : "SeatGeek: no price (client_id lacks affiliate pricing scope — expected until approved).";
+
   return Response.json({
+    SUMMARY: summary,
+    seatgeekNote: sgNote,
     keysPresent: {
       ticketmaster: !!TM_KEY,
       seatgeek: !!SG_ID,
@@ -97,6 +121,5 @@ export async function GET(request) {
     query: { home, day },
     ticketmaster: tm,
     seatgeek: sg,
-    hint: "If keysPresent is false, add the env vars in Vercel → Settings → Environment Variables and redeploy. If TM returns matches with hasPriceRanges:true, real prices will show. SeatGeek lowestPrice:null means the client_id lacks affiliate pricing scope.",
   });
 }
