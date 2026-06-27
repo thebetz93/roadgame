@@ -22,11 +22,21 @@ export async function GET(request) {
   }
 
   const day = date.split("T")[0];
+  // Query a ±1 day UTC window so evening/West-coast games (whose UTC start
+  // lands on the next calendar day) aren't missed, then match on the event's
+  // LOCAL date. A strict same-UTC-day window drops most night games.
+  const start = new Date(day);
+  start.setDate(start.getDate() - 1);
+  const end = new Date(day);
+  end.setDate(end.getDate() + 1);
+  const gte = start.toISOString().slice(0, 10);
+  const lte = end.toISOString().slice(0, 10);
+
   // Search by home team only — more reliable than both names combined.
   const kw = encodeURIComponent(home);
   const url = `${BASE_URL}/events.json?apikey=${API_KEY}` +
-    `&keyword=${kw}&startDateTime=${day}T00:00:00Z&endDateTime=${day}T23:59:59Z` +
-    `&classificationName=sports&size=10&countryCode=US`;
+    `&keyword=${kw}&startDateTime=${gte}T00:00:00Z&endDateTime=${lte}T23:59:59Z` +
+    `&classificationName=sports&size=20&countryCode=US`;
 
   try {
     const res = await fetch(url);
@@ -35,6 +45,10 @@ export async function GET(request) {
     for (const ev of events) {
       const name = (ev.name || "").toLowerCase();
       if (NON_GAME_KEYWORDS.some(k => name.includes(k))) continue;
+      // Only accept the event whose LOCAL date matches the target day.
+      const evDay = ev.dates?.start?.localDate
+        || (ev.dates?.start?.dateTime || "").slice(0, 10);
+      if (evDay !== day) continue;
       const price = ev.priceRanges?.length
         ? Math.floor(Math.min(...ev.priceRanges.map(r => r.min).filter(Boolean)))
         : null;
