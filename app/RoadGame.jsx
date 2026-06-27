@@ -967,6 +967,19 @@ const [schedule, setSchedule] = useState([]);
           80%  { opacity: 1; transform: translateX(0); }
           100% { opacity: 0; transform: translateX(40px); }
         }
+        /* Tasteful micro-animations — fully disabled under reduced-motion. */
+        @keyframes rgRise   { from { opacity: 0; transform: translateY(8px); }  to { opacity: 1; transform: none; } }
+        @keyframes rgFade   { from { opacity: 0; }                              to { opacity: 1; } }
+        @keyframes rgExpand { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+        @keyframes rgToast  { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        .rg-press { transition: transform 0.12s ease; }
+        @media (prefers-reduced-motion: no-preference) {
+          .rg-rise   { animation: rgRise 0.34s cubic-bezier(0.22,1,0.36,1) backwards; }
+          .rg-fade   { animation: rgFade 0.26s ease both; }
+          .rg-expand { animation: rgExpand 0.24s cubic-bezier(0.22,1,0.36,1) backwards; }
+          .rg-toast  { animation: rgToast 0.30s cubic-bezier(0.22,1,0.36,1) backwards; }
+          .rg-press:active { transform: scale(0.97); }
+        }
       `}</style>
 
       {showSplash && (
@@ -988,7 +1001,7 @@ const [schedule, setSchedule] = useState([]);
       )}
 
       {toast && (
-        <div style={{
+        <div className="rg-toast" style={{
           position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
           background: BRAND.cream, color: BRAND.charcoal,
           borderRadius: 8, padding: "9px 18px",
@@ -1322,7 +1335,7 @@ const [schedule, setSchedule] = useState([]);
             ["following", "FOLLOWING"],
             ["teams", "BROWSE TEAMS"],
           ].map(([id, lbl]) => (
-            <button key={id} onClick={() => setView(id)} className="oswald" style={{
+            <button key={id} onClick={() => setView(id)} className="oswald rg-press" style={{
               flex: 1, padding: "9px 6px", borderRadius: 7, border: "none", cursor: "pointer",
               background: view === id ? BRAND.green : BRAND.slateLight,
               color: view === id ? BRAND.charcoal : BRAND.muted,
@@ -1526,7 +1539,7 @@ const [schedule, setSchedule] = useState([]);
 
       {/* ── TEAMS BROWSER ── */}
       {view === "teams" && !activeTeam && (
-        <div style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
+        <div className="rg-fade" style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>PICK YOUR TEAMS</div>
             {browseLeagueLoading && <div style={{ fontSize: 10, color: BRAND.green, fontWeight: 600 }}>loading games…</div>}
@@ -1535,7 +1548,7 @@ const [schedule, setSchedule] = useState([]);
 
           <div style={{ display: "flex", gap: 5, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
             {SORTED_LEAGUES.map(l => (
-              <button key={l.id} onClick={() => setActiveLeague(l.id)} className="oswald" style={{
+              <button key={l.id} onClick={() => setActiveLeague(l.id)} className="oswald rg-press" style={{
                 padding: "8px 14px", borderRadius: 8, border: "none", cursor: "pointer",
                 background: activeLeague === l.id ? BRAND.green : BRAND.slateLight,
                 color: activeLeague === l.id ? BRAND.charcoal : BRAND.muted,
@@ -1553,14 +1566,15 @@ const [schedule, setSchedule] = useState([]);
               fontFamily: "'Inter', sans-serif",
             }} />
 
-          {teamsInLeague.map(team => {
+          {teamsInLeague.map((team, ti) => {
             const venue = VENUES[team];
             const dist = venue ? haversine(userLat, userLng, venue.lat, venue.lng) : null;
             const tier = dist !== null ? travelTier(dist) : null;
             const fav = isFollowing(team, activeLeague);
             const browseClosest = (browseLeagueGames[activeLeague] ?? {})[team] ?? null;
             return (
-              <div key={team} style={{
+              <div key={team} className="rg-rise rg-press" style={{
+                animationDelay: `${Math.min(ti, 12) * 28}ms`,
                 background: fav ? "rgba(124,194,66,0.08)" : BRAND.slateLight,
                 border: fav ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
                 borderRadius: 10, padding: "11px 13px", marginBottom: 6,
@@ -1599,7 +1613,7 @@ const [schedule, setSchedule] = useState([]);
 
       {/* ── FOLLOWING VIEW ── */}
       {view === "following" && !activeTeam && (
-        <div style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
+        <div className="rg-fade" style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.3 }}>
             {user ? `HEY, ${(user.name || user.email || "").split(" ")[0].toUpperCase() || "THERE"}.` : "FOLLOWING"}
           </div>
@@ -1642,7 +1656,7 @@ const [schedule, setSchedule] = useState([]);
               return 2;
             };
             return rank(a) - rank(b);
-          }).map(f => {
+          }).map((f, fi) => {
             const meta = LEAGUES.find(l => l.id === f.league);
             const isOpen = expandedFollowTeam === `${f.team}-${f.league}`;
             const teamAlerts = alerts
@@ -1650,9 +1664,9 @@ const [schedule, setSchedule] = useState([]);
               .sort((a, b) => a.dist - b.dist);
             const urgentCount = teamAlerts.filter(a => a.isWeek).length;
             return (
-              <div key={`${f.team}-${f.league}`} style={{ marginBottom: 8 }}>
+              <div key={`${f.team}-${f.league}`} className="rg-rise" style={{ animationDelay: `${Math.min(fi, 12) * 28}ms`, marginBottom: 8 }}>
                 {/* Team header row */}
-                <div onClick={() => setExpandedFollowTeam(isOpen ? null : `${f.team}-${f.league}`)}
+                <div className="rg-press" onClick={() => setExpandedFollowTeam(isOpen ? null : `${f.team}-${f.league}`)}
                   style={{
                     background: isOpen ? "rgba(124,194,66,0.08)" : BRAND.slateLight,
                     borderTop: isOpen ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.08)`,
@@ -1685,7 +1699,7 @@ const [schedule, setSchedule] = useState([]);
 
                 {/* Expanded nearby games */}
                 {isOpen && (
-                  <div style={{
+                  <div className="rg-expand" style={{
                     background: BRAND.slateDark,
                     border: `1.5px solid ${BRAND.green}`, borderTop: "none",
                     borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
@@ -1749,7 +1763,7 @@ const [schedule, setSchedule] = useState([]);
 
       {/* ── SCHEDULE VIEW ── */}
       {activeTeam && (
-        <div style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
+        <div className="rg-fade" style={{ padding: "14px 14px", maxWidth: 600, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
             <button onClick={() => setActiveTeam(null)} className="oswald" style={{
               background: BRAND.slateLight, border: "none",
@@ -1861,14 +1875,15 @@ const [schedule, setSchedule] = useState([]);
               </div>
             </div>
           )}
-          {visibleSchedule.map(game => {
+          {visibleSchedule.map((game, gi) => {
             const tier = travelTier(game.dist);
             const isExpanded = expanded === game.id;
             const reachable = game.dist != null && game.dist <= maxDist;
             const rel = relInfo(game.dateISO);
             return (
               <div key={game.id} style={{ marginBottom: isExpanded ? 0 : 7, opacity: reachable ? 1 : 0.4 }}>
-                <div onClick={() => { setExpanded(isExpanded ? null : game.id); setTravelTab("tickets"); }} style={{
+                <div className="rg-rise rg-press" onClick={() => { setExpanded(isExpanded ? null : game.id); setTravelTab("tickets"); }} style={{
+                  animationDelay: `${Math.min(gi, 12) * 28}ms`,
                   background: isExpanded ? "rgba(124,194,66,0.06)" : BRAND.slateLight,
                   borderTop: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
                   borderRight: isExpanded ? `1.5px solid ${BRAND.green}` : `1px solid rgba(245,239,226,0.06)`,
@@ -1910,7 +1925,9 @@ const [schedule, setSchedule] = useState([]);
                 </div>
 
                 {isExpanded && (
-                  <ExpandedPanel game={game} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} showToast={showToast} />
+                  <div className="rg-expand">
+                    <ExpandedPanel game={game} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} showToast={showToast} />
+                  </div>
                 )}
               </div>
             );
