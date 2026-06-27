@@ -1,6 +1,13 @@
 "use client";
 
-export default function Error({ reset }) {
+import { useEffect } from "react";
+
+export default function Error({ error, reset }) {
+  useEffect(() => {
+    // Surface the error (and its digest) for debugging instead of discarding it.
+    console.error("App error boundary:", error);
+  }, [error]);
+
   return (
     <div style={{
       minHeight: "100dvh",

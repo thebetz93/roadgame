@@ -4,12 +4,11 @@ const PRICE_MAP = { 0: "Free", 1: "$", 2: "$$", 3: "$$$", 4: "$$$$" };
 
 async function nearbySearch(lat, lng, type, key) {
   const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
+  // radius + client-side rating sort. Don't also send rankby — rankby and
+  // radius are mutually exclusive in the Places API and including both errors.
   url.searchParams.set("location", `${lat},${lng}`);
   url.searchParams.set("radius", "6000");
   url.searchParams.set("type", type);
-  url.searchParams.set("rankby", "prominence");
-  // rankby=prominence requires no radius — use a different combo
-  // Actually use radius + sort by rating client-side
   url.searchParams.set("key", key);
 
   const res = await fetch(url.toString());
