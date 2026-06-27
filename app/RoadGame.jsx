@@ -841,7 +841,6 @@ const [schedule, setSchedule] = useState([]);
         padding: 20,
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
           * { box-sizing: border-box; }
           .ticket-stub { position: relative; }
           .ticket-stub::before, .ticket-stub::after {
