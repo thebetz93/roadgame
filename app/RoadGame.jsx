@@ -347,6 +347,9 @@ export default function RoadGame() {
   const [authOpen, setAuthOpen] = useState(false);
 
   const [view, setView] = useState("following");
+  // Remembers which main screen you were on before opening the Account page,
+  // so its back button returns you there instead of a blank view.
+  const [preProfileView, setPreProfileView] = useState("following");
   const [activeLeague, setActiveLeague] = useState(SORTED_LEAGUES[0].id);
   const [search, setSearch] = useState("");
   const [following, setFollowing] = useState([]);
@@ -1262,7 +1265,7 @@ const [schedule, setSchedule] = useState([]);
               minWidth: 230, overflow: "hidden",
             }}>
               {/* MY ACCOUNT */}
-              <button onClick={() => { setAccountMenuOpen(false); user ? setView("profile") : setAuthOpen(true); }}
+              <button onClick={() => { setAccountMenuOpen(false); if (user) { if (view === "following" || view === "teams") setPreProfileView(view); setView("profile"); } else { setAuthOpen(true); } }}
                 className="oswald"
                 style={{
                   width: "100%", textAlign: "left", padding: "14px 16px",
@@ -1345,7 +1348,7 @@ const [schedule, setSchedule] = useState([]);
       {/* ── PROFILE ── */}
       {view === "profile" && user && (
         <div style={{ padding: "16px 14px", maxWidth: 500, margin: "0 auto" }}>
-          <button onClick={() => setView("alerts")} className="oswald" style={{
+          <button onClick={() => setView(preProfileView)} className="oswald" style={{
             background: BRAND.slateLight, border: "none",
             borderRadius: 7, padding: "6px 12px", color: BRAND.cream,
             fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", marginBottom: 18,
@@ -1511,8 +1514,8 @@ const [schedule, setSchedule] = useState([]);
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {[
                 { value: following.length, label: "TEAMS", accent: BRAND.cream, target: "teams" },
-                { value: alerts.length, label: "ALERTS", accent: BRAND.green, target: "alerts" },
-                { value: weekAlerts.length, label: "THIS WEEK", accent: weekAlerts.length > 0 ? BRAND.red : BRAND.cream, target: "alerts" },
+                { value: alerts.length, label: "ALERTS", accent: BRAND.green, target: "following" },
+                { value: weekAlerts.length, label: "THIS WEEK", accent: weekAlerts.length > 0 ? BRAND.red : BRAND.cream, target: "following" },
               ].map(({ value, label, accent, target }) => (
                 <button key={label} onClick={() => setView(target)} style={{
                   background: BRAND.slateDark, borderRadius: 8, padding: "9px 10px",
