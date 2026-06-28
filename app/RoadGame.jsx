@@ -821,11 +821,8 @@ const [schedule, setSchedule] = useState([]);
 
   // ─────────────── LOADING ────────────────
   if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", background: BRAND.slate, display: "flex", alignItems: "center", justifyContent: "center", color: BRAND.muted, fontFamily: "'Oswald', sans-serif", letterSpacing: 2 }}>
-        LOADING ROADGAME...
-      </div>
-    );
+    // Blank background until the splash screen takes over — no flash of text.
+    return <div style={{ minHeight: "100vh", background: BRAND.slate }} />;
   }
 
   // ─────────────── COMPLETE PROFILE ────────────────
@@ -1821,7 +1818,7 @@ const [schedule, setSchedule] = useState([]);
             }}>
               <div className="oswald" style={{
                 fontSize: 12, color: BRAND.muted, letterSpacing: 2, fontWeight: 700,
-              }}>LOADING REAL SCHEDULE...</div>
+              }}>LOADING SCHEDULE</div>
             </div>
           )}
 
