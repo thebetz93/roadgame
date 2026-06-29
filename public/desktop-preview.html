@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RoadGame — Desktop Preview (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --slate:#3A4A54; --slateDark:#2C3A42; --slateLight:#4A5E6A;
+    --cream:#FFFFFF; --creamDim:#E8E2D8; --green:#7CC242; --greenDark:#5FA82E;
+    --charcoal:#1F2A30; --muted:#A8BDC8; --red:#E84545; --amber:#F2A538;
+    --orange:#E87A3A; --fly:#9BB4E8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--slate);color:var(--cream);font-family:'Inter',sans-serif;
+       -webkit-font-smoothing:antialiased;line-height:1.4}
+  .oswald{font-family:'Oswald',sans-serif}
+  a{color:inherit;text-decoration:none}
+
+  /* Mockup banner */
+  .banner{background:var(--green);color:var(--charcoal);text-align:center;
+          font-size:12px;font-weight:700;letter-spacing:.5px;padding:7px 12px}
+
+  /* ---------- Top header ---------- */
+  header{position:sticky;top:0;z-index:50;background:var(--slateDark);
+         border-bottom:2px solid var(--green)}
+  .hbar{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:24px;
+        padding:12px 24px}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-mark{width:34px;height:34px;border-radius:8px;background:var(--green);
+             display:flex;align-items:center;justify-content:center;color:var(--charcoal);
+             font-weight:800;font-size:18px}
+  .logo-txt{font-family:'Oswald',sans-serif;font-weight:700;font-size:20px;letter-spacing:1px}
+  nav.tabs{display:flex;gap:6px;margin-left:8px}
+  nav.tabs a{font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;
+             color:var(--muted);padding:9px 16px;border-radius:8px}
+  nav.tabs a.active{background:var(--green);color:var(--charcoal)}
+  nav.tabs a:not(.active):hover{background:var(--slateLight);color:var(--cream);cursor:pointer}
+  .spacer{flex:1}
+  .loc{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+       font-family:'Oswald',sans-serif;letter-spacing:1px}
+  .search{background:var(--slate);border:1px solid rgba(255,255,255,.08);border-radius:8px;
+          padding:8px 12px;color:var(--cream);font-size:13px;width:190px;font-family:'Inter',sans-serif}
+  .search::placeholder{color:var(--muted)}
+  .avatar{width:34px;height:34px;border-radius:8px;background:var(--slateLight);
+          display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+
+  /* ---------- Hero ---------- */
+  .hero{max-width:1240px;margin:0 auto;padding:34px 24px 10px}
+  .hero h1{font-family:'Oswald',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.5px}
+  .hero h1 span{color:var(--green)}
+  .hero p{color:var(--muted);font-size:15px;margin-top:6px}
+
+  /* ---------- Layout: sidebar + main ---------- */
+  .shell{max-width:1240px;margin:0 auto;padding:18px 24px 60px;
+         display:grid;grid-template-columns:248px 1fr;gap:24px;align-items:start}
+
+  .side{position:sticky;top:84px;display:flex;flex-direction:column;gap:16px}
+  .panel{background:var(--slateLight);border-radius:14px;padding:16px}
+  .panel h3{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:1.5px;
+            color:var(--muted);font-weight:700;margin-bottom:12px}
+  .league{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+          font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;letter-spacing:.5px;
+          color:var(--muted);cursor:pointer;margin-bottom:4px}
+  .league:hover{background:rgba(255,255,255,.04);color:var(--cream)}
+  .league.active{background:var(--green);color:var(--charcoal)}
+  .league .em{font-size:15px}
+  .league .ct{margin-left:auto;font-size:11px;opacity:.7}
+  .slabel{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .slabel b{color:var(--green);font-family:'Oswald',sans-serif}
+  input[type=range]{width:100%;accent-color:var(--green)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:12px}
+  .chk input{accent-color:var(--green)}
+
+  /* ---------- Team grid ---------- */
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+  .sec-head h2{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700}
+  .sec-head .sub{color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px}
+  .card{background:var(--slateLight);border:1px solid rgba(255,255,255,.05);border-radius:12px;
+        padding:14px;display:flex;flex-direction:column;gap:10px;transition:transform .12s ease,border-color .12s ease;cursor:pointer}
+  .card:hover{transform:translateY(-3px);border-color:var(--green)}
+  .card .top{display:flex;align-items:center;gap:11px}
+  .mono{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+        font-family:'Oswald',sans-serif;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}
+  .card .name{font-size:14px;font-weight:700}
+  .card .city{font-size:11px;color:var(--muted);margin-top:1px}
+  .card .row{display:flex;align-items:center;justify-content:space-between}
+  .tier{font-family:'Oswald',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;
+        padding:3px 8px;border-radius:5px}
+  .closest{font-size:11px;color:var(--muted)}
+  .closest b{color:var(--cream)}
+  .follow{border:1.5px solid var(--muted);background:transparent;color:var(--muted);
+          border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:.5px}
+  .follow.on{background:var(--green);border-color:var(--green);color:var(--charcoal)}
+
+  /* ---------- Schedule detail showcase ---------- */
+  .detail{margin-top:46px}
+  .detail-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;margin-top:14px}
+  .game{background:var(--slateLight);border-left:4px solid var(--green);border-radius:10px;
+        padding:13px 15px;margin-bottom:9px}
+  .game.away{border-left-color:var(--amber)}
+  .game .gmeta{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .game .gdate{font-family:'Oswald',sans-serif;font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px}
+  .pill{font-size:9px;font-weight:700;letter-spacing:1px;padding:1px 6px;border-radius:3px}
+  .pill.home{background:var(--green);color:var(--charcoal)}
+  .pill.away{background:rgba(242,165,56,.2);color:var(--amber)}
+  .game .match{font-size:15px;font-weight:700}
+  .game .gsub{font-size:11px;color:var(--muted);margin-top:2px}
+  .game .gright{float:right;text-align:right}
+  .price{font-family:'Oswald',sans-serif;color:var(--green);font-weight:700;font-size:15px}
+
+  .rail{position:sticky;top:84px;display:flex;flex-direction:column;gap:14px}
+  .map{height:180px;border-radius:14px;background:
+       linear-gradient(135deg,#33454f,#2a3942);border:1px solid rgba(255,255,255,.06);
+       display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;position:relative;overflow:hidden}
+  .map .pin{position:absolute;width:16px;height:16px;border-radius:50% 50% 50% 0;
+            background:var(--red);transform:rotate(-45deg)}
+  .vend{display:flex;align-items:center;gap:11px;background:var(--slate);border-radius:9px;padding:9px 11px;margin-bottom:7px}
+  .vend.best{border:2px solid var(--green);background:rgba(124,194,66,.10)}
+  .vlogo{width:30px;height:30px;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+  .vlogo img{width:22px;height:22px;object-fit:contain}
+  .vend .vname{font-size:13px;font-weight:700}
+  .vend .vsub{font-size:10px;color:var(--muted)}
+  .vend .go{margin-left:auto;font-family:'Oswald',sans-serif;font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px}
+
+  footer{border-top:1px solid rgba(255,255,255,.06);margin-top:40px}
+  .fbar{max-width:1240px;margin:0 auto;padding:24px;color:var(--muted);font-size:12px;
+        display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  /* Responsive: collapse to single column on smaller widths */
+  @media (max-width:920px){
+    .shell{grid-template-columns:1fr}
+    .side{position:static}
+    .detail-grid{grid-template-columns:1fr}
+    nav.tabs,.loc,.search{display:none}
+  }
+</style>
+</head>
+<body>
+  <div class="banner">DESKTOP MOCKUP — static preview only · not wired to live data · mobile/PWA app is unchanged</div>
+
+  <header>
+    <div class="hbar">
+      <div class="logo"><div class="logo-mark">▦</div><div class="logo-txt">ROADGAME</div></div>
+      <nav class="tabs">
+        <a>Following</a>
+        <a class="active">Browse Teams</a>
+        <a>My Trips</a>
+      </nav>
+      <div class="spacer"></div>
+      <div class="loc">📍 MOUNTAIN HOME, NC</div>
+      <input class="search" placeholder="Search teams…" />
+      <div class="avatar">JB</div>
+    </div>
+  </header>
+
+  <div class="hero">
+    <h1>Your team, <span>near you.</span></h1>
+    <p>Plan the trip — find games within reach, compare tickets, book the stay.</p>
+  </div>
+
+  <div class="shell">
+    <!-- Sidebar -->
+    <aside class="side">
+      <div class="panel">
+        <h3>LEAGUES</h3>
+        <div class="league active"><span class="em">⚾</span> MLB <span class="ct">30</span></div>
+        <div class="league"><span class="em">🏈</span> NFL <span class="ct">32</span></div>
+        <div class="league"><span class="em">🏈</span> CFB <span class="ct">65</span></div>
+        <div class="league"><span class="em">🏒</span> NHL <span class="ct">32</span></div>
+        <div class="league"><span class="em">🏀</span> NBA <span class="ct">30</span></div>
+      </div>
+      <div class="panel">
+        <h3>REACH DISTANCE</h3>
+        <div class="slabel"><span>Max</span><b>≤ 600 MI</b></div>
+        <input type="range" min="50" max="2500" value="600" />
+        <div class="chk"><input type="checkbox" checked /> Reachable games only</div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main>
+      <div class="sec-head">
+        <h2>BROWSE MLB TEAMS</h2>
+        <span class="sub">30 teams · sorted by distance from Mountain Home, NC</span>
+      </div>
+      <div class="grid" id="grid"></div>
+
+      <!-- Schedule detail showcase -->
+      <section class="detail">
+        <div class="sec-head">
+          <h2>ATLANTA BRAVES</h2>
+          <span class="sub">how a schedule looks on desktop — list + sticky detail rail</span>
+        </div>
+        <div class="detail-grid">
+          <div id="games"></div>
+          <div class="rail">
+            <div class="map"><div class="pin"></div>&nbsp;&nbsp;Truist Park · Atlanta, GA</div>
+            <div class="panel">
+              <h3>FIND TICKETS · BRAVES vs METS</h3>
+              <div class="vend best">
+                <div class="vlogo"><img src="https://www.google.com/s2/favicons?domain=seatgeek.com&sz=128" alt="SeatGeek"/></div>
+                <div><div class="vname">SeatGeek</div><div class="vsub">From $24 · Best pick</div></div>
+                <div class="go">GET →</div>
+              </div>
+              <div class="vend">
+                <div class="vlogo"><img src="https://www.google.com/s2/favicons?domain=ticketmaster.com&sz=128" alt="Ticketmaster"/></div>
+                <div><div class="vname">Ticketmaster</div><div class="vsub">Official primary</div></div>
+                <div class="go">GET →</div>
+              </div>
+              <div class="vend">
+                <div class="vlogo"><img src="https://www.google.com/s2/favicons?domain=vividseats.com&sz=128" alt="Vivid Seats"/></div>
+                <div><div class="vname">Vivid Seats</div><div class="vsub">Rewards program</div></div>
+                <div class="go">GET →</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer><div class="fbar"><span>RoadGame · desktop concept</span><span>Mountain Home, NC</span></div></footer>
+
+<script>
+  // Tier logic mirrors the app: <100 LOCAL, <400 ROAD TRIP, <900 LONG HAUL, else FLY
+  function tier(d){
+    if(d<100) return {l:'LOCAL',c:'#7CC242',b:'rgba(124,194,66,.18)'};
+    if(d<400) return {l:'ROAD TRIP',c:'#F2A538',b:'rgba(242,165,56,.15)'};
+    if(d<900) return {l:'LONG HAUL',c:'#E87A3A',b:'rgba(232,122,58,.15)'};
+    return {l:'FLY',c:'#9BB4E8',b:'rgba(155,180,232,.15)'};
+  }
+  const teams = [
+    {n:'Atlanta Braves',c:'Atlanta, GA',d:165,col:'#13274F',ab:'ATL',g:'Aug 14 vs Mets'},
+    {n:'Cincinnati Reds',c:'Cincinnati, OH',d:322,col:'#C6011F',ab:'CIN',g:'Aug 09 vs Cubs'},
+    {n:'Washington Nationals',c:'Washington, DC',d:399,col:'#AB0003',ab:'WSH',g:'Aug 16 vs Phillies'},
+    {n:'Baltimore Orioles',c:'Baltimore, MD',d:430,col:'#DF4601',ab:'BAL',g:'Aug 12 vs Rays'},
+    {n:'Tampa Bay Rays',c:'St. Petersburg, FL',d:520,col:'#092C5C',ab:'TB',g:'Aug 19 vs Yankees'},
+    {n:'Pittsburgh Pirates',c:'Pittsburgh, PA',d:430,col:'#FDB827',ab:'PIT',g:'Aug 10 vs Brewers'},
+    {n:'St. Louis Cardinals',c:'St. Louis, MO',d:620,col:'#C41E3A',ab:'STL',g:'Aug 22 vs Cubs'},
+    {n:'Miami Marlins',c:'Miami, FL',d:650,col:'#00A3E0',ab:'MIA',g:'Aug 18 vs Braves'},
+    {n:'Cleveland Guardians',c:'Cleveland, OH',d:480,col:'#0C2340',ab:'CLE',g:'Aug 11 vs Tigers'},
+    {n:'Texas Rangers',c:'Arlington, TX',d:1000,col:'#003278',ab:'TEX',g:'Sep 02 vs Astros'},
+    {n:'Chicago Cubs',c:'Chicago, IL',d:590,col:'#0E3386',ab:'CHC',g:'Aug 25 vs Reds'},
+    {n:'New York Mets',c:'New York, NY',d:640,col:'#FF5910',ab:'NYM',g:'Aug 28 vs Braves'},
+  ];
+  document.getElementById('grid').innerHTML = teams.map((t,i)=>{
+    const tt=tier(t.d);const on=i===0?'on':'';
+    return `<div class="card">
+      <div class="top">
+        <div class="mono" style="background:${t.col}">${t.ab}</div>
+        <div><div class="name">${t.n}</div><div class="city">${t.c}</div></div>
+      </div>
+      <div class="row">
+        <span class="tier" style="color:${tt.c};background:${tt.b}">${tt.l}</span>
+        <span class="closest">Closest: <b>${t.d} mi</b></span>
+      </div>
+      <div class="row">
+        <span class="closest">Next: ${t.g}</span>
+        <button class="follow ${on}">${on?'✓ FOLLOWING':'+ FOLLOW'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const games = [
+    {date:'SAT AUG 14 · 7:20 PM',home:true,match:'vs New York Mets',sub:'Truist Park · Atlanta, GA · 165 mi',price:'$24'},
+    {date:'SUN AUG 15 · 1:35 PM',home:true,match:'vs New York Mets',sub:'Truist Park · Atlanta, GA · 165 mi',price:'$19'},
+    {date:'FRI AUG 20 · 8:05 PM',home:false,match:'@ Cincinnati Reds',sub:'Great American Ball Park · 322 mi',price:'$31'},
+    {date:'SAT SEP 04 · 4:10 PM',home:true,match:'vs Philadelphia Phillies',sub:'Truist Park · Atlanta, GA · 165 mi',price:'$28'},
+  ];
+  document.getElementById('games').innerHTML = games.map(g=>`
+    <div class="game ${g.home?'':'away'}">
+      <div class="gright"><div class="price">${g.price}+</div></div>
+      <div class="gmeta">
+        <span class="gdate">${g.date}</span>
+        <span class="pill ${g.home?'home':'away'}">${g.home?'HOME':'AWAY'}</span>
+      </div>
+      <div class="match">${g.match}</div>
+      <div class="gsub">${g.sub}</div>
+    </div>`).join('');
+
+  // Light interactivity for the mockup
+  document.querySelectorAll('.league').forEach(el=>el.onclick=()=>{
+    document.querySelector('.league.active')?.classList.remove('active');
+    el.classList.add('active');
+  });
+  document.querySelectorAll('nav.tabs a').forEach(el=>el.onclick=()=>{
+    document.querySelector('nav.tabs a.active')?.classList.remove('active');
+    el.classList.add('active');
+  });
+</script>
+</body>
+</html>
