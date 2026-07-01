@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { BRAND } from "../../lib/brand";
-import { SORTED_LEAGUES, TEAMS_BY_LEAGUE } from "../../lib/leagues";
+import { LEAGUES, SORTED_LEAGUES, TEAMS_BY_LEAGUE } from "../../lib/leagues";
 import { haversine, travelTier, fmtDate, fmtTime, relInfo } from "../../lib/helpers";
 import { VENUES } from "../../venues";
 import ExpandedPanel from "../ExpandedPanel";
@@ -270,6 +270,85 @@ function ScheduleView({ bag }) {
   );
 }
 
+function FollowingView({ bag }) {
+  const { user, following, alerts, alertRadius, setView, setAuthOpen, openSchedule } = bag;
+
+  const teamAlertsFor = (f) => alerts.filter(a => a.team === f.team && a.league === f.league).sort((a, b) => a.dist - b.dist);
+  const rank = (f) => { const ta = teamAlertsFor(f); if (ta.some(a => a.isWeek)) return 0; if (ta.length) return 1; return 2; };
+  const sorted = [...following].sort((a, b) => rank(a) - rank(b));
+
+  return (
+    <main>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 16 }}>
+        <h2 className="oswald" style={{ fontSize: 23, fontWeight: 700 }}>
+          {user ? `HEY, ${(user.name || user.email || "").split(" ")[0].toUpperCase() || "THERE"}.` : "FOLLOWING"}
+        </h2>
+        <span style={{ color: BRAND.muted, fontSize: 13 }}>
+          {following.length ? `${following.length} team${following.length === 1 ? "" : "s"} · game alerts float to the top` : "Follow teams to see their games near you"}
+        </span>
+      </div>
+
+      {!user ? (
+        <div style={{ background: BRAND.slateLight, border: `2px dashed ${BRAND.green}`, borderRadius: 14, padding: "40px 30px", textAlign: "center", maxWidth: 460 }}>
+          <div className="oswald" style={{ fontSize: 18, fontWeight: 700, letterSpacing: 0.5 }}>SIGN IN TO FOLLOW TEAMS</div>
+          <div style={{ fontSize: 13, color: BRAND.muted, marginTop: 8, marginBottom: 18 }}>Pick your favorites and we'll surface their games near you.</div>
+          <button onClick={() => setAuthOpen(true)} className="oswald" style={{ background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 8, padding: "11px 24px", fontSize: 13, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>SIGN IN →</button>
+        </div>
+      ) : following.length === 0 ? (
+        <div style={{ background: BRAND.slateLight, border: `2px dashed ${BRAND.green}`, borderRadius: 14, padding: "40px 30px", textAlign: "center", maxWidth: 460 }}>
+          <div className="oswald" style={{ fontSize: 18, fontWeight: 700 }}>NO TEAMS YET</div>
+          <div style={{ fontSize: 13, color: BRAND.muted, marginTop: 8, marginBottom: 18 }}>Head to Browse Teams and follow your favorites.</div>
+          <button onClick={() => setView("teams")} className="oswald" style={{ background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 8, padding: "11px 24px", fontSize: 13, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>BROWSE TEAMS →</button>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 12 }}>
+          {sorted.map(f => {
+            const meta = LEAGUES.find(l => l.id === f.league);
+            const ta = teamAlertsFor(f);
+            const urgent = ta.filter(a => a.isWeek).length;
+            return (
+              <div key={`${f.team}-${f.league}`} style={{
+                background: BRAND.slateLight, borderRadius: 12,
+                borderLeft: `4px solid ${urgent > 0 ? BRAND.red : BRAND.green}`,
+                border: "1px solid rgba(255,255,255,0.05)", borderLeftWidth: 4,
+                borderLeftColor: urgent > 0 ? BRAND.red : BRAND.green, padding: 14,
+              }}>
+                <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>{meta?.emoji} {meta?.name}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{f.team}</div>
+                  {urgent > 0 && <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, background: BRAND.red, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>● {urgent} THIS WEEK</div>}
+                </div>
+                <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 3 }}>
+                  {ta.length ? `${ta.length} game${ta.length === 1 ? "" : "s"} within ${alertRadius} mi` : `No games within ${alertRadius} mi in 30 days`}
+                </div>
+                {ta.slice(0, 3).map((a, i) => (
+                  <div key={i} onClick={() => openSchedule(a.team, a.league, a.id)} style={{
+                    marginTop: 8, cursor: "pointer",
+                    background: a.isWeek ? "rgba(232,69,69,0.08)" : "rgba(242,165,56,0.06)",
+                    borderLeft: `3px solid ${a.isWeek ? BRAND.red : BRAND.amber}`,
+                    borderRadius: 8, padding: "8px 11px",
+                  }}>
+                    <div className="oswald" style={{ fontSize: 10, color: a.isWeek ? BRAND.red : BRAND.amber, fontWeight: 700, letterSpacing: 1 }}>
+                      {a.isWeek ? "THIS WEEK · " : ""}{fmtDate(a.dateISO).toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 1 }}>{a.isHome ? `vs ${a.away}` : `@ ${a.home}`}</div>
+                    <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1 }}>{a.city} · {a.dist} mi</div>
+                  </div>
+                ))}
+                <button onClick={() => openSchedule(f.team, f.league)} className="oswald" style={{
+                  width: "100%", marginTop: 10, padding: "9px", background: "transparent",
+                  border: `1.5px solid ${BRAND.green}`, color: BRAND.green, borderRadius: 8,
+                  fontSize: 11, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer",
+                }}>VIEW FULL SCHEDULE →</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </main>
+  );
+}
+
 function Placeholder({ title }) {
   return (
     <main style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 320 }}>
@@ -293,7 +372,7 @@ export default function DesktopApp({ bag }) {
 
   let content;
   if (activeTeam) content = <ScheduleView bag={bag} />;
-  else if (view === "following") content = <Placeholder title="FOLLOWING" />;              // PR5
+  else if (view === "following") content = <FollowingView bag={bag} />;
   else if (view === "profile") content = <Placeholder title="YOUR ACCOUNT" />;             // PR5
   else content = <BrowseView bag={bag} />;
 
