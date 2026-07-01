@@ -110,7 +110,7 @@ function LeagueBar({ bag }) {
   );
 }
 
-function TeamCard({ team, bag }) {
+function TeamCard({ team, bag, idx = 0 }) {
   const { activeLeague, userLat, userLng, browseLeagueGames, isFollowing, toggleFollow, openSchedule } = bag;
   const venue = VENUES[team];
   const dist = venue ? haversine(userLat, userLng, venue.lat, venue.lng) : null;
@@ -118,7 +118,8 @@ function TeamCard({ team, bag }) {
   const tier = travelTier(dist);
   const fav = isFollowing(team, activeLeague);
   return (
-    <div onClick={() => openSchedule(team, activeLeague)} style={{
+    <div onClick={() => openSchedule(team, activeLeague)} className="d-card d-reveal" style={{
+      transitionDelay: `${Math.min(idx, 14) * 30}ms`,
       background: fav ? "rgba(124,194,66,0.08)" : BRAND.slateLight,
       border: fav ? `1.5px solid ${BRAND.green}` : "1px solid rgba(255,255,255,0.05)",
       borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10, cursor: "pointer",
@@ -180,17 +181,18 @@ function BrowseView({ bag }) {
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(248px,1fr))", gap: 12 }}>
-        {teams.map(t => <TeamCard key={t} team={t} bag={bag} />)}
+        {teams.map((t, i) => <TeamCard key={t} team={t} bag={bag} idx={i} />)}
       </div>
     </main>
   );
 }
 
-function GameRow({ game, selected, onSelect }) {
+function GameRow({ game, selected, onSelect, idx = 0 }) {
   const tier = travelTier(game.dist);
   const rel = relInfo(game.dateISO);
   return (
-    <div onClick={() => onSelect(game.id)} style={{
+    <div onClick={() => onSelect(game.id)} className="d-reveal" style={{
+      transitionDelay: `${Math.min(idx, 14) * 30}ms`,
       background: selected ? "rgba(124,194,66,0.10)" : BRAND.slateLight,
       border: `1px solid ${selected ? BRAND.green : "rgba(255,255,255,0.05)"}`,
       borderLeft: `4px solid ${game.isHome ? BRAND.green : BRAND.amber}`,
@@ -269,7 +271,7 @@ function ScheduleView({ bag }) {
 
       {!scheduleLoading && visibleSchedule.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "start" }}>
-          <div>{visibleSchedule.map(g => <GameRow key={g.id} game={g} selected={selected?.id === g.id} onSelect={setExpanded} />)}</div>
+          <div>{visibleSchedule.map((g, i) => <GameRow key={g.id} game={g} selected={selected?.id === g.id} onSelect={setExpanded} idx={i} />)}</div>
           <div style={{ position: "sticky", top: 92 }}>
             {selected && (
               <ExpandedPanel game={selected} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} showToast={showToast} />
@@ -313,12 +315,13 @@ function FollowingView({ bag }) {
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 12 }}>
-          {sorted.map(f => {
+          {sorted.map((f, i) => {
             const meta = LEAGUES.find(l => l.id === f.league);
             const ta = teamAlertsFor(f);
             const urgent = ta.filter(a => a.isWeek).length;
             return (
-              <div key={`${f.team}-${f.league}`} style={{
+              <div key={`${f.team}-${f.league}`} className="d-card d-reveal" style={{
+                transitionDelay: `${Math.min(i, 14) * 30}ms`,
                 background: BRAND.slateLight, borderRadius: 12,
                 borderLeft: `4px solid ${urgent > 0 ? BRAND.red : BRAND.green}`,
                 border: "1px solid rgba(255,255,255,0.05)", borderLeftWidth: 4,
@@ -517,8 +520,8 @@ function HomeView({ bag }) {
         </div>
       </section>
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 16, paddingBottom: 40 }}>
-        {features.map(f => (
-          <div key={f.title} style={{ background: BRAND.slateLight, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: 22 }}>
+        {features.map((f, i) => (
+          <div key={f.title} className="d-card d-reveal" style={{ transitionDelay: `${i * 80}ms`, background: BRAND.slateLight, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: 22 }}>
             <div style={{ fontSize: 26 }}>{f.icon}</div>
             <div className="oswald" style={{ fontSize: 16, fontWeight: 700, marginTop: 10, letterSpacing: 0.3 }}>{f.title}</div>
             <div style={{ fontSize: 13, color: BRAND.muted, marginTop: 6, lineHeight: 1.5 }}>{f.body}</div>
@@ -528,6 +531,44 @@ function HomeView({ bag }) {
     </div>
   );
 }
+
+// Reveal-on-scroll: fade/rise elements as they enter the viewport. Re-runs when
+// the content key changes so newly-rendered items get observed. Fully disabled
+// under prefers-reduced-motion.
+function useScrollReveal(contentKey) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const els = document.querySelectorAll(".d-reveal:not(.in)");
+    if (!("IntersectionObserver" in window)) { els.forEach(e => e.classList.add("in")); return; }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { threshold: 0.08, rootMargin: "0px 0px -6% 0px" });
+    els.forEach(e => io.observe(e));
+    return () => io.disconnect();
+  }, [contentKey]);
+}
+
+const DESKTOP_CSS = `
+  @keyframes dDrift { from { transform: translate(0,0) scale(1); } to { transform: translate(-4%,-3%) scale(1.06); } }
+  @keyframes dFade  { from { opacity: 0; } to { opacity: 1; } }
+  .d-app { position: relative; }
+  .d-app::before { content:''; position: fixed; inset: -25%; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(38% 38% at 18% 22%, rgba(124,194,66,.10), transparent 70%),
+      radial-gradient(32% 32% at 84% 68%, rgba(124,194,66,.06), transparent 72%),
+      radial-gradient(30% 30% at 60% 100%, rgba(155,180,232,.05), transparent 70%); }
+  .d-layer { position: relative; z-index: 1; }
+  .d-card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  .d-fade { animation: dFade .3s ease both; }
+  @media (prefers-reduced-motion: no-preference) {
+    .d-app::before { animation: dDrift 30s ease-in-out infinite alternate; }
+    .d-reveal { opacity: 0; transform: translateY(18px);
+      transition: opacity .6s cubic-bezier(.22,1,.36,1), transform .6s cubic-bezier(.22,1,.36,1); }
+    .d-reveal.in { opacity: 1; transform: none; }
+    .d-card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,.28); }
+  }
+`;
 
 export default function DesktopApp({ bag }) {
   const { view, activeTeam, setView, toast, user } = bag;
@@ -549,6 +590,9 @@ export default function DesktopApp({ bag }) {
 
   const goHome = () => { bag.setActiveTeam(null); setView("home"); };
 
+  const contentKey = `${view}:${activeTeam?.team || ""}:${bag.activeLeague}`;
+  useScrollReveal(contentKey);
+
   let content;
   if (activeTeam) content = <ScheduleView bag={bag} />;
   else if (view === "home") content = <HomeView bag={bag} />;
@@ -557,10 +601,13 @@ export default function DesktopApp({ bag }) {
   else content = <BrowseView bag={bag} />;
 
   return (
-    <div style={{ minHeight: "100vh", background: BRAND.slate, color: BRAND.cream, fontFamily: "'Inter',sans-serif" }}>
-      <Header bag={bag} goHome={goHome} />
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "26px 24px 60px" }}>
-        {content}
+    <div className="d-app" style={{ minHeight: "100vh", background: BRAND.slate, color: BRAND.cream, fontFamily: "'Inter',sans-serif" }}>
+      <style>{DESKTOP_CSS}</style>
+      <div className="d-layer">
+        <Header bag={bag} goHome={goHome} />
+        <div key={contentKey} className="d-fade" style={{ maxWidth: 1240, margin: "0 auto", padding: "26px 24px 60px" }}>
+          {content}
+        </div>
       </div>
 
       <AuthModal open={bag.authOpen} user={bag.user} setAuthOpen={bag.setAuthOpen}

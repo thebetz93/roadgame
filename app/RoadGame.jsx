@@ -20,7 +20,7 @@ import TeamLogo from "./components/TeamLogo";
 // useIsDesktop resolves after mount so the first render always matches the
 // mobile default — no hydration mismatch.
 const DESKTOP_MIN = 1280;
-const DESKTOP_ENABLED = false; // flipped on in the final desktop PR
+const DESKTOP_ENABLED = true; // desktop layout live at >= DESKTOP_MIN px
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
