@@ -2,8 +2,9 @@
 import { useEffect } from "react";
 import { BRAND } from "../../lib/brand";
 import { SORTED_LEAGUES, TEAMS_BY_LEAGUE } from "../../lib/leagues";
-import { haversine, travelTier } from "../../lib/helpers";
+import { haversine, travelTier, fmtDate, fmtTime, relInfo } from "../../lib/helpers";
 import { VENUES } from "../../venues";
+import ExpandedPanel from "../ExpandedPanel";
 
 // ── Desktop layout (>=1280px). Gated behind DESKTOP_ENABLED / ?desktop=1 until
 // the full desktop experience ships. State + handlers come from RoadGame via
@@ -175,6 +176,100 @@ function BrowseView({ bag }) {
   );
 }
 
+function GameRow({ game, selected, onSelect }) {
+  const tier = travelTier(game.dist);
+  const rel = relInfo(game.dateISO);
+  return (
+    <div onClick={() => onSelect(game.id)} style={{
+      background: selected ? "rgba(124,194,66,0.10)" : BRAND.slateLight,
+      border: `1px solid ${selected ? BRAND.green : "rgba(255,255,255,0.05)"}`,
+      borderLeft: `4px solid ${game.isHome ? BRAND.green : BRAND.amber}`,
+      borderRadius: 10, padding: "12px 14px", marginBottom: 9, cursor: "pointer",
+    }}>
+      <div style={{ float: "right", textAlign: "right" }}>
+        {game.ticketsFrom != null && <div className="oswald" style={{ color: BRAND.green, fontWeight: 700, fontSize: 15 }}>${game.ticketsFrom}+</div>}
+        <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, padding: "2px 6px", borderRadius: 4, marginTop: 4, color: tier.color, background: tier.bg, display: "inline-block" }}>{tier.label}</div>
+      </div>
+      <div className="oswald" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+        <span style={{ fontSize: 11, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>{fmtDate(game.dateISO).toUpperCase()} · {fmtTime(game.dateISO)}</span>
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, padding: "1px 6px", borderRadius: 3, background: game.isHome ? BRAND.green : "rgba(242,165,56,0.2)", color: game.isHome ? BRAND.charcoal : BRAND.amber }}>{game.isHome ? "HOME" : "AWAY"}</span>
+        {rel && <span style={{ fontSize: 9, fontWeight: 700, color: rel.soon ? BRAND.amber : BRAND.muted }}>{rel.text.toUpperCase()}</span>}
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700 }}>{game.isHome ? `vs ${game.away}` : `@ ${game.home}`}</div>
+      <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 2 }}>
+        {game.venue} · {game.city}{game.dist != null ? ` · ${game.dist} mi` : ""}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleView({ bag }) {
+  const {
+    activeTeam, setActiveTeam, isFollowing, toggleFollow,
+    visibleSchedule, scheduleLoading, scheduleError, reachableCount,
+    leagueMeta, maxDist, expanded, setExpanded, travelTab, setTravelTab,
+    userCity, showToast,
+  } = bag;
+  const fav = isFollowing(activeTeam.team, activeTeam.league);
+  const selected = visibleSchedule.find(g => g.id === expanded) || visibleSchedule[0] || null;
+  const nearest = (() => { const d = visibleSchedule.filter(g => g.dist != null); return d.length ? `${Math.min(...d.map(g => g.dist))}MI` : "—"; })();
+
+  return (
+    <main>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <button onClick={() => setActiveTeam(null)} className="oswald" style={{ background: BRAND.slateLight, border: "none", borderRadius: 7, padding: "7px 13px", color: BRAND.cream, fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>← BACK</button>
+        <div style={{ flex: 1 }}>
+          <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>{leagueMeta?.emoji} {leagueMeta?.name} · {leagueMeta?.season}</div>
+          <div className="oswald" style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.3, lineHeight: 1.05 }}>{activeTeam.team.toUpperCase()}</div>
+        </div>
+        <button onClick={() => toggleFollow(activeTeam.team, activeTeam.league)} className="oswald" style={{ background: fav ? BRAND.green : "transparent", border: `1.5px solid ${BRAND.green}`, color: fav ? BRAND.charcoal : BRAND.green, borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>{fav ? "✓ FOLLOWING" : "+ FOLLOW"}</button>
+      </div>
+
+      {!scheduleLoading && visibleSchedule.length > 0 && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          {[["GAMES", visibleSchedule.length, BRAND.cream], [`WITHIN ${maxDist}MI`, reachableCount, BRAND.green], ["NEAREST", nearest, BRAND.amber]].map(([label, value, accent]) => (
+            <div key={label} style={{ flex: 1, background: BRAND.slateLight, borderRadius: 10, padding: "12px 14px" }}>
+              <div className="oswald" style={{ fontSize: 10, color: BRAND.muted, letterSpacing: 1.2, fontWeight: 700 }}>{label}</div>
+              <div className="oswald" style={{ fontSize: 24, fontWeight: 700, color: accent, marginTop: 2 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {scheduleLoading && (
+        <div style={{ background: BRAND.slateLight, border: `1.5px solid rgba(124,194,66,0.2)`, borderRadius: 12, padding: "40px 20px", textAlign: "center" }}>
+          <div className="oswald" style={{ fontSize: 13, color: BRAND.muted, letterSpacing: 2, fontWeight: 700 }}>LOADING SCHEDULE</div>
+        </div>
+      )}
+      {!scheduleLoading && scheduleError && (
+        <div style={{ background: BRAND.slateLight, borderRadius: 12, padding: "40px 20px", textAlign: "center" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>📡</div>
+          <div className="oswald" style={{ fontSize: 17, fontWeight: 700 }}>SCHEDULE UNAVAILABLE</div>
+          <div style={{ fontSize: 13, color: BRAND.muted, marginTop: 6 }}>Couldn't load the schedule right now. Check back in a moment.</div>
+        </div>
+      )}
+      {!scheduleLoading && !scheduleError && visibleSchedule.length === 0 && (
+        <div style={{ background: BRAND.slateLight, border: `2px dashed ${BRAND.green}`, borderRadius: 12, padding: "40px 20px", textAlign: "center" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>🏟️</div>
+          <div className="oswald" style={{ fontSize: 19, fontWeight: 700 }}>COME BACK NEXT SEASON!</div>
+          <div style={{ fontSize: 13, color: BRAND.muted, marginTop: 6, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>{activeTeam.team} doesn't have any upcoming games posted yet.</div>
+        </div>
+      )}
+
+      {!scheduleLoading && visibleSchedule.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "start" }}>
+          <div>{visibleSchedule.map(g => <GameRow key={g.id} game={g} selected={selected?.id === g.id} onSelect={setExpanded} />)}</div>
+          <div style={{ position: "sticky", top: 92 }}>
+            {selected && (
+              <ExpandedPanel game={selected} activeTeam={activeTeam} travelTab={travelTab} setTravelTab={setTravelTab} userCity={userCity} showToast={showToast} />
+            )}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
 function Placeholder({ title }) {
   return (
     <main style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 320 }}>
@@ -197,7 +292,7 @@ export default function DesktopApp({ bag }) {
   }, []);
 
   let content;
-  if (activeTeam) content = <Placeholder title={activeTeam.team.toUpperCase()} />;         // PR4
+  if (activeTeam) content = <ScheduleView bag={bag} />;
   else if (view === "following") content = <Placeholder title="FOLLOWING" />;              // PR5
   else if (view === "profile") content = <Placeholder title="YOUR ACCOUNT" />;             // PR5
   else content = <BrowseView bag={bag} />;
