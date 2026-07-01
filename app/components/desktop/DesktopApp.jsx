@@ -5,6 +5,9 @@ import { LEAGUES, SORTED_LEAGUES, TEAMS_BY_LEAGUE } from "../../lib/leagues";
 import { haversine, travelTier, fmtDate, fmtTime, relInfo } from "../../lib/helpers";
 import { VENUES } from "../../venues";
 import ExpandedPanel from "../ExpandedPanel";
+import LogoMark from "../LogoMark";
+import AuthModal from "../AuthModal";
+import LocationPicker from "../LocationPicker";
 
 // ── Desktop layout (>=1280px). Gated behind DESKTOP_ENABLED / ?desktop=1 until
 // the full desktop experience ships. State + handlers come from RoadGame via
@@ -23,9 +26,10 @@ function monoColor(team) {
   return `hsl(${h}, 42%, 30%)`;
 }
 
-function Header({ bag }) {
-  const { view, setView, setActiveTeam, search, setSearch, userCity, user, setAuthOpen } = bag;
+function Header({ bag, goHome }) {
+  const { view, setView, setActiveTeam, search, setSearch, userCity, user, setAuthOpen, setLocInput, setLocPickerOpen } = bag;
   const inits = ((user?.name || user?.email || "?").trim()[0] || "?").toUpperCase();
+  const firstName = (user?.name || user?.email || "").split(" ")[0];
   const go = (v) => { setActiveTeam(null); setView(v); };
   const tab = (id, label) => (
     <a onClick={() => go(id)} style={{
@@ -40,64 +44,68 @@ function Header({ bag }) {
       position: "sticky", top: 0, zIndex: 50, background: "rgba(44,58,66,0.92)",
       backdropFilter: "blur(10px)", borderBottom: `2px solid ${BRAND.green}`,
     }}>
-      <div style={{ maxWidth: 1240, margin: "0 auto", display: "flex", alignItems: "center", gap: 24, padding: "13px 24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => go("teams")}>
-          <div className="oswald" style={{ width: 34, height: 34, borderRadius: 8, background: BRAND.green, color: BRAND.charcoal, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 17 }}>▦</div>
-          <div className="oswald" style={{ fontWeight: 700, fontSize: 20, letterSpacing: 1 }}>ROADGAME</div>
+      <div style={{ maxWidth: 1240, margin: "0 auto", display: "flex", alignItems: "center", gap: 22, padding: "12px 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }} onClick={goHome} title="Home">
+          <LogoMark size={34} />
         </div>
-        <nav style={{ display: "flex", gap: 6, marginLeft: 8 }}>
+        <nav style={{ display: "flex", gap: 6, marginLeft: 4 }}>
           {tab("following", "FOLLOWING")}
           {tab("teams", "BROWSE TEAMS")}
         </nav>
         <div style={{ flex: 1 }} />
-        <div className="oswald" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: BRAND.muted, letterSpacing: 1 }}>
-          📍 {(userCity || "SET LOCATION").toUpperCase()}
-        </div>
+        <button onClick={() => { setLocInput(userCity); setLocPickerOpen(true); }} className="oswald" style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: userCity ? BRAND.muted : BRAND.green, letterSpacing: 1,
+        }}>📍 {(userCity || "SET LOCATION").toUpperCase()}</button>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search teams…" style={{
           background: BRAND.slate, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 8,
-          padding: "8px 12px", color: BRAND.cream, fontSize: 13, width: 190, fontFamily: "'Inter',sans-serif", outline: "none",
+          padding: "8px 12px", color: BRAND.cream, fontSize: 13, width: 180, fontFamily: "'Inter',sans-serif", outline: "none",
         }} />
-        <div onClick={() => user ? setView("profile") : setAuthOpen(true)} className="oswald" style={{
-          width: 34, height: 34, borderRadius: 8, background: BRAND.slateLight, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13,
-        }}>{inits}</div>
+        {user ? (
+          <div onClick={() => setView("profile")} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
+            <span className="oswald" style={{ fontSize: 12, color: BRAND.cream, fontWeight: 600, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Welcome, {firstName}</span>
+            <div className="oswald" style={{ width: 34, height: 34, borderRadius: 8, background: BRAND.green, color: BRAND.charcoal, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{inits}</div>
+          </div>
+        ) : (
+          <button onClick={() => setAuthOpen(true)} className="oswald" style={{
+            background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 8,
+            padding: "9px 18px", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer", whiteSpace: "nowrap",
+          }}>SIGN IN</button>
+        )}
       </div>
     </header>
   );
 }
 
-function Sidebar({ bag }) {
-  const { activeLeague, setActiveLeague, maxDist, setMaxDist, nearbyOnly, setNearbyOnly } = bag;
-  const counts = Object.fromEntries(Object.entries(TEAMS_BY_LEAGUE).map(([k, v]) => [k, v.length]));
+// Horizontal Leagues + Game Distance bar — Browse Teams page only. Clicking a
+// league always navigates to that league's team grid (never a no-op).
+function LeagueBar({ bag }) {
+  const { activeLeague, setActiveLeague, setView, setActiveTeam, maxDist, setMaxDist, nearbyOnly, setNearbyOnly } = bag;
+  const pickLeague = (id) => { setActiveTeam(null); setActiveLeague(id); setView("teams"); };
   return (
-    <aside style={{ position: "sticky", top: 92, display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ background: BRAND.slateLight, borderRadius: 14, padding: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
-        <h3 className="oswald" style={{ fontSize: 11, letterSpacing: 1.5, color: BRAND.muted, fontWeight: 700, marginBottom: 12 }}>LEAGUES</h3>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14, marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span className="oswald" style={{ fontSize: 11, letterSpacing: 1.5, color: BRAND.muted, fontWeight: 700, marginRight: 4 }}>LEAGUES</span>
         {SORTED_LEAGUES.map(l => (
-          <div key={l.id} onClick={() => setActiveLeague(l.id)} className="oswald" style={{
-            display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 9,
-            fontWeight: 700, fontSize: 13, letterSpacing: 0.5, cursor: "pointer", marginBottom: 4,
-            background: activeLeague === l.id ? BRAND.green : "transparent",
+          <button key={l.id} onClick={() => pickLeague(l.id)} className="oswald" style={{
+            border: "none", cursor: "pointer", padding: "8px 14px", borderRadius: 8,
+            fontWeight: 700, fontSize: 12, letterSpacing: 0.5, whiteSpace: "nowrap",
+            background: activeLeague === l.id ? BRAND.green : BRAND.slateLight,
             color: activeLeague === l.id ? BRAND.charcoal : BRAND.muted,
-          }}>
-            <span style={{ fontSize: 15 }}>{l.emoji}</span> {l.name}
-            <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.7 }}>{counts[l.id]}</span>
-          </div>
+          }}>{l.emoji} {l.name}</button>
         ))}
       </div>
-      <div style={{ background: BRAND.slateLight, borderRadius: 14, padding: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
-        <h3 className="oswald" style={{ fontSize: 11, letterSpacing: 1.5, color: BRAND.muted, fontWeight: 700, marginBottom: 12 }}>REACH DISTANCE</h3>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: BRAND.muted, marginBottom: 6 }}>
-          <span>Max</span>
-          <b className="oswald" style={{ color: BRAND.green }}>{maxDist >= 2500 ? "ANYWHERE" : `≤ ${maxDist} MI`}</b>
-        </div>
-        <input type="range" min={50} max={2500} step={50} value={maxDist} onChange={e => setMaxDist(Number(e.target.value))} style={{ width: "100%", accentColor: BRAND.green }} />
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: BRAND.muted, marginTop: 12, cursor: "pointer" }}>
+      <div style={{ flex: 1 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, background: BRAND.slateLight, borderRadius: 10, padding: "9px 14px", border: "1px solid rgba(255,255,255,0.05)" }}>
+        <span className="oswald" style={{ fontSize: 11, letterSpacing: 1.5, color: BRAND.muted, fontWeight: 700 }}>GAME DISTANCE</span>
+        <input type="range" min={50} max={2500} step={50} value={maxDist} onChange={e => setMaxDist(Number(e.target.value))} style={{ width: 150, accentColor: BRAND.green }} />
+        <b className="oswald" style={{ color: BRAND.green, fontSize: 12, minWidth: 78 }}>{maxDist >= 2500 ? "ANYWHERE" : `≤ ${maxDist} MI`}</b>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: BRAND.muted, cursor: "pointer", whiteSpace: "nowrap" }}>
           <input type="checkbox" checked={nearbyOnly} onChange={e => setNearbyOnly(e.target.checked)} style={{ accentColor: BRAND.green }} />
-          Reachable teams only
+          Reachable only
         </label>
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -162,6 +170,7 @@ function BrowseView({ bag }) {
 
   return (
     <main>
+      <LeagueBar bag={bag} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 16 }}>
         <h2 className="oswald" style={{ fontSize: 23, fontWeight: 700 }}>BROWSE {league?.name} TEAMS</h2>
         <span style={{ color: BRAND.muted, fontSize: 13 }}>
@@ -479,6 +488,8 @@ export default function DesktopApp({ bag }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const goHome = () => { bag.setActiveTeam(null); setView("teams"); };
+
   let content;
   if (activeTeam) content = <ScheduleView bag={bag} />;
   else if (view === "following") content = <FollowingView bag={bag} />;
@@ -487,11 +498,19 @@ export default function DesktopApp({ bag }) {
 
   return (
     <div style={{ minHeight: "100vh", background: BRAND.slate, color: BRAND.cream, fontFamily: "'Inter',sans-serif" }}>
-      <Header bag={bag} />
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "26px 24px 60px", display: "grid", gridTemplateColumns: "248px 1fr", gap: 24, alignItems: "start" }}>
-        <Sidebar bag={bag} />
+      <Header bag={bag} goHome={goHome} />
+      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "26px 24px 60px" }}>
         {content}
       </div>
+
+      <AuthModal open={bag.authOpen} user={bag.user} setAuthOpen={bag.setAuthOpen}
+        otpSent={bag.otpSent} setOtpSent={bag.setOtpSent} otpCode={bag.otpCode} setOtpCode={bag.setOtpCode}
+        authEmail={bag.authEmail} setAuthEmail={bag.setAuthEmail} authError={bag.authError} setAuthError={bag.setAuthError}
+        handleAuth={bag.handleAuth} handleVerifyOtp={bag.handleVerifyOtp} />
+      <LocationPicker open={bag.locPickerOpen} setLocPickerOpen={bag.setLocPickerOpen}
+        locInput={bag.locInput} setLocInput={bag.setLocInput} saveLocPicker={bag.saveLocPicker}
+        detectLocPicker={bag.detectLocPicker} locDetecting={bag.locDetecting} />
+
       {toast && (
         <div className="oswald" style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: BRAND.cream, color: BRAND.charcoal, borderRadius: 8, padding: "9px 18px", fontSize: 12, fontWeight: 700, letterSpacing: 0.5, zIndex: 100, boxShadow: "0 10px 30px rgba(0,0,0,0.5)", borderLeft: `4px solid ${BRAND.green}` }}>{toast}</div>
       )}
