@@ -8,6 +8,7 @@ import ExpandedPanel from "../ExpandedPanel";
 import LogoMark from "../LogoMark";
 import AuthModal from "../AuthModal";
 import LocationPicker from "../LocationPicker";
+import TeamLogo from "../TeamLogo";
 
 // ── Desktop layout (>=1280px). Gated behind DESKTOP_ENABLED / ?desktop=1 until
 // the full desktop experience ships. State + handlers come from RoadGame via
@@ -123,7 +124,7 @@ function TeamCard({ team, bag }) {
       borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10, cursor: "pointer",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-        <div className="oswald" style={{ width: 40, height: 40, borderRadius: 10, background: monoColor(team), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>{initials(team)}</div>
+        <TeamLogo team={team} league={activeLeague} size={40} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{team}</div>
           <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 1 }}>{venue?.c || ""}</div>
@@ -227,6 +228,7 @@ function ScheduleView({ bag }) {
     <main>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <button onClick={() => setActiveTeam(null)} className="oswald" style={{ background: BRAND.slateLight, border: "none", borderRadius: 7, padding: "7px 13px", color: BRAND.cream, fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>← BACK</button>
+        <TeamLogo team={activeTeam.team} league={activeTeam.league} size={46} />
         <div style={{ flex: 1 }}>
           <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>{leagueMeta?.emoji} {leagueMeta?.name} · {leagueMeta?.season}</div>
           <div className="oswald" style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.3, lineHeight: 1.05 }}>{activeTeam.team.toUpperCase()}</div>
@@ -322,10 +324,15 @@ function FollowingView({ bag }) {
                 border: "1px solid rgba(255,255,255,0.05)", borderLeftWidth: 4,
                 borderLeftColor: urgent > 0 ? BRAND.red : BRAND.green, padding: 14,
               }}>
-                <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>{meta?.emoji} {meta?.name}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>{f.team}</div>
-                  {urgent > 0 && <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, background: BRAND.red, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>● {urgent} THIS WEEK</div>}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <TeamLogo team={f.team} league={f.league} size={34} />
+                  <div>
+                    <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>{meta?.emoji} {meta?.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{f.team}</div>
+                      {urgent > 0 && <div className="oswald" style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, background: BRAND.red, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>● {urgent} THIS WEEK</div>}
+                    </div>
+                  </div>
                 </div>
                 <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 3 }}>
                   {ta.length ? `${ta.length} game${ta.length === 1 ? "" : "s"} within ${alertRadius} mi` : `No games within ${alertRadius} mi in 30 days`}

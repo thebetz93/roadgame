@@ -12,6 +12,7 @@ import ExpandedPanel from "./components/ExpandedPanel";
 import LogoMark from "./components/LogoMark";
 import AuthModal from "./components/AuthModal";
 import LocationPicker from "./components/LocationPicker";
+import TeamLogo from "./components/TeamLogo";
 
 // ─── Desktop layout plumbing (PR 1 of the desktop build) ────────────────────
 // The desktop UI activates at >= DESKTOP_MIN px, but stays gated behind
@@ -1246,17 +1247,20 @@ const [schedule, setSchedule] = useState([]);
                 borderRadius: 10, padding: "11px 13px", marginBottom: 6,
                 display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
               }}>
-                <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => openSchedule(team, activeLeague)}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{team}</div>
-                  {venue && (
-                    <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>
-                      {venue.c}{!browseLeagueGames[activeLeague]
-                        ? <span style={{ opacity: 0.35 }}> • …</span>
-                        : browseClosest
-                          ? ` • Closest Game: ${browseClosest.city.split(",")[0]} - ${browseClosest.dist}m`
-                          : dist !== null ? ` • ${dist}m` : ""}
-                    </div>
-                  )}
+                <div style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }} onClick={() => openSchedule(team, activeLeague)}>
+                  <TeamLogo team={team} league={activeLeague} size={34} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.cream }}>{team}</div>
+                    {venue && (
+                      <div style={{ fontSize: 10, color: BRAND.muted, marginTop: 1, fontWeight: 500 }}>
+                        {venue.c}{!browseLeagueGames[activeLeague]
+                          ? <span style={{ opacity: 0.35 }}> • …</span>
+                          : browseClosest
+                            ? ` • Closest Game: ${browseClosest.city.split(",")[0]} - ${browseClosest.dist}m`
+                            : dist !== null ? ` • ${dist}m` : ""}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {tier && (
                   <div className="oswald" style={{
@@ -1344,7 +1348,9 @@ const [schedule, setSchedule] = useState([]);
                     padding: "13px 14px", cursor: "pointer",
                     display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
                   }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+                    <TeamLogo team={f.team} league={f.league} size={34} />
+                    <div style={{ minWidth: 0 }}>
                     <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>{meta.emoji} {meta.name}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.cream }}>{f.team}</div>
@@ -1358,6 +1364,7 @@ const [schedule, setSchedule] = useState([]);
                       {teamAlerts.length > 0
                         ? `${teamAlerts.length} game${teamAlerts.length === 1 ? "" : "s"} within ${alertRadius} mi`
                         : `No games within ${alertRadius} mi in 30 days`}
+                    </div>
                     </div>
                   </div>
                   <div style={{ fontSize: 18, color: BRAND.muted, transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "none" }}>›</div>
@@ -1436,6 +1443,7 @@ const [schedule, setSchedule] = useState([]);
               borderRadius: 7, padding: "6px 11px", color: BRAND.cream,
               fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
             }}>← BACK</button>
+            <TeamLogo team={activeTeam.team} league={activeTeam.league} size={38} />
             <div style={{ flex: 1 }}>
               <div className="oswald" style={{ fontSize: 10, color: BRAND.green, fontWeight: 700, letterSpacing: 1.5 }}>
                 {leagueMeta.emoji} {leagueMeta.name} · {leagueMeta.season}
