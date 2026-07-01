@@ -4,6 +4,31 @@ import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
 
+// ─── Desktop layout plumbing (PR 1 of the desktop build) ────────────────────
+// The desktop UI activates at >= DESKTOP_MIN px, but stays gated behind
+// DESKTOP_ENABLED until every desktop view is built (full-parity launch).
+// useIsDesktop resolves after mount so the first render always matches the
+// mobile default — no hydration mismatch.
+const DESKTOP_MIN = 1280;
+const DESKTOP_ENABLED = false; // flipped on in the final desktop PR
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(`(min-width: ${DESKTOP_MIN}px)`);
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
+  return isDesktop;
+}
+
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
 // Expedia Travel Creator deep-link tracking (from a generated affiliate link).
 // Wrap ANY Expedia destination URL with expediaAffiliate(url) so the click is
@@ -321,6 +346,11 @@ function LogoMark({ size = 32 }) {
 
 // ─── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function RoadGame() {
+
+  // Desktop layout gate — no-op until DESKTOP_ENABLED is flipped on. Exposed as
+  // a data attribute so the breakpoint can be verified in devtools meanwhile.
+  const isDesktop = useIsDesktop();
+  const useDesktopLayout = DESKTOP_ENABLED && isDesktop;
 
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("signin");
@@ -944,7 +974,7 @@ const [schedule, setSchedule] = useState([]);
 
   // ─────────────── MAIN APP ────────────────
   return (
-    <div style={{
+    <div data-layout={useDesktopLayout ? "desktop" : "mobile"} data-viewport={isDesktop ? "wide" : "narrow"} style={{
       minHeight: "100vh",
       background: BRAND.slate,
       fontFamily: "'Inter', sans-serif",
