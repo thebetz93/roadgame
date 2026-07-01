@@ -44,7 +44,6 @@ export function travelTier(d) {
 
 export function modesFor(d) {
   if (d == null) return [];
-  if (d < 80) return ["drive"];
-  if (d < 450) return ["drive", "train"];
-  return ["fly", "drive"];
+  // Always offer Drive + Fly for any real distance (Train removed).
+  return ["drive", "fly"];
 }

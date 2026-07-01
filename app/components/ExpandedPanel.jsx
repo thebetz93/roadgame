@@ -148,7 +148,6 @@ function guideFor(city) { return CITY_GUIDES[city] || DEFAULT_GUIDE; }
 const TRAVEL = {
   fly:   { icon: "✈", label: "Fly",   color: "#9BB4E8" },
   drive: { icon: "🚗", label: "Drive", color: BRAND.green },
-  train: { icon: "🚆", label: "Train", color: BRAND.amber },
 };
 
 function SectionHeader({ children }) {
@@ -217,7 +216,6 @@ export default function ExpandedPanel({ game, activeTeam, travelTab, setTravelTa
           ["city", "CITY"],
           ["hotels", "HOTELS"],
           ["transport", "GO"],
-          ["map", "MAP"],
         ].map(([t, lbl]) => (
           <button key={t} onClick={() => setTravelTab(t)} className="oswald" style={{
             padding: "5px 10px", borderRadius: 6, border: "none", cursor: "pointer",
@@ -456,10 +454,8 @@ export default function ExpandedPanel({ game, activeTeam, travelTab, setTravelTa
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {modesFor(game.dist).map(m => {
             const info = m === "fly"
-              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: expediaAffiliate(`https://www.expedia.com/Flights`) }
-              : m === "drive"
-              ? { est: `~$${Math.round(game.dist * 0.17)} gas`, time: `${Math.round(game.dist / 60)}h`, link: `https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.city)}` }
-              : { est: `~$${Math.round(25 + game.dist * 0.08)}`, time: `${Math.ceil(game.dist / 70)}h`, link: "https://www.amtrak.com" };
+              ? { est: `~$${Math.round(80 + game.dist * 0.11)}`, time: `${Math.ceil(game.dist / 450)}h`, link: expediaAffiliate(`https://www.expedia.com/Flights`), cta: "SEARCH →" }
+              : { est: `~$${Math.round(game.dist * 0.17)} gas`, time: `${Math.round(game.dist / 60)}h`, link: `https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.venue + " " + game.city)}`, cta: "DIRECTIONS →" };
             return (
               <div key={m} style={{ background: BRAND.slateLight, borderLeft: `4px solid ${TRAVEL[m].color}`, borderRadius: 8, padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -472,30 +468,13 @@ export default function ExpandedPanel({ game, activeTeam, travelTab, setTravelTa
                 <a href={info.link} target="_blank" rel="noopener noreferrer" className="oswald" style={{
                   background: BRAND.green, color: BRAND.charcoal, borderRadius: 6, padding: "5px 10px",
                   fontSize: 10, fontWeight: 700, letterSpacing: 1, textDecoration: "none",
-                }}>SEARCH →</a>
+                }}>{info.cta}</a>
               </div>
             );
           })}
         </div>
       )}
 
-      {travelTab === "map" && (
-        <div>
-          <div style={{ background: BRAND.slateLight, borderRadius: 10, padding: 14, textAlign: "center", marginBottom: 8, borderLeft: `4px solid ${BRAND.green}` }}>
-            <div style={{ fontSize: 22, marginBottom: 4 }}>●</div>
-            <div className="oswald" style={{ fontSize: 14, fontWeight: 700, color: BRAND.cream, letterSpacing: -0.2 }}>{game.venue.toUpperCase()}</div>
-            <div style={{ fontSize: 11, color: BRAND.muted, fontWeight: 500 }}>{game.city}</div>
-            {game.dist != null && <div className="oswald" style={{ fontSize: 11, color: BRAND.green, marginTop: 5, fontWeight: 700, letterSpacing: 1 }}>{game.dist} MILES FROM {userCity.toUpperCase()}</div>}
-          </div>
-          <a href={`https://www.google.com/maps/dir/${encodeURIComponent(userCity)}/${encodeURIComponent(game.venue + " " + game.city)}`}
-            target="_blank" rel="noopener noreferrer" className="oswald"
-            style={{
-              display: "block", textAlign: "center", background: BRAND.green, color: BRAND.charcoal,
-              borderRadius: 8, padding: "11px", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textDecoration: "none",
-              boxShadow: `0 3px 0 ${BRAND.greenDark}`,
-            }}>GET DIRECTIONS →</a>
-        </div>
-      )}
     </div>
   );
 }
