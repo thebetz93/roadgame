@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script>document.documentElement.classList.add('js');</script>
 <style>
   :root{
     --slate:#3A4A54; --slateDark:#2C3A42; --slateLight:#4A5E6A;
@@ -15,57 +16,92 @@
     --orange:#E87A3A; --fly:#9BB4E8;
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
   body{background:var(--slate);color:var(--cream);font-family:'Inter',sans-serif;
-       -webkit-font-smoothing:antialiased;line-height:1.4}
+       -webkit-font-smoothing:antialiased;line-height:1.4;overflow-x:hidden}
   .oswald{font-family:'Oswald',sans-serif}
   a{color:inherit;text-decoration:none}
 
-  /* Mockup banner */
+  /* ---------- Ambient animated background ---------- */
+  body::before{content:'';position:fixed;inset:-25%;z-index:-2;pointer-events:none;
+    background:
+      radial-gradient(38% 38% at 18% 22%, rgba(124,194,66,.12), transparent 70%),
+      radial-gradient(32% 32% at 84% 68%, rgba(124,194,66,.07), transparent 72%),
+      radial-gradient(30% 30% at 60% 100%, rgba(155,180,232,.06), transparent 70%);
+    animation:drift 28s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate(0,0) scale(1)}
+                   to{transform:translate(-4%,-3%) scale(1.06)}}
+  body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(120% 90% at 50% -10%, transparent 60%, rgba(0,0,0,.22))}
+
+  /* scroll progress */
+  .progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--green);
+            z-index:60;box-shadow:0 0 10px rgba(124,194,66,.6)}
+
   .banner{background:var(--green);color:var(--charcoal);text-align:center;
           font-size:12px;font-weight:700;letter-spacing:.5px;padding:7px 12px}
 
-  /* ---------- Top header ---------- */
-  header{position:sticky;top:0;z-index:50;background:var(--slateDark);
-         border-bottom:2px solid var(--green)}
+  /* ---------- Top header (shrinks on scroll) ---------- */
+  header{position:sticky;top:0;z-index:50;background:rgba(44,58,66,.82);
+         backdrop-filter:blur(10px);border-bottom:2px solid var(--green);
+         transition:background .3s ease, box-shadow .3s ease}
+  header.scrolled{background:rgba(44,58,66,.96);box-shadow:0 8px 30px rgba(0,0,0,.35)}
   .hbar{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:24px;
-        padding:12px 24px}
+        padding:14px 24px;transition:padding .3s ease}
+  header.scrolled .hbar{padding:9px 24px}
   .logo{display:flex;align-items:center;gap:10px}
   .logo-mark{width:34px;height:34px;border-radius:8px;background:var(--green);
              display:flex;align-items:center;justify-content:center;color:var(--charcoal);
-             font-weight:800;font-size:18px}
+             font-weight:800;font-size:18px;transition:transform .3s ease}
+  header.scrolled .logo-mark{transform:scale(.9)}
   .logo-txt{font-family:'Oswald',sans-serif;font-weight:700;font-size:20px;letter-spacing:1px}
   nav.tabs{display:flex;gap:6px;margin-left:8px}
-  nav.tabs a{font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;
-             color:var(--muted);padding:9px 16px;border-radius:8px}
+  nav.tabs a{position:relative;font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;
+             letter-spacing:1px;color:var(--muted);padding:9px 16px;border-radius:8px;
+             transition:color .2s ease,background .2s ease}
   nav.tabs a.active{background:var(--green);color:var(--charcoal)}
   nav.tabs a:not(.active):hover{background:var(--slateLight);color:var(--cream);cursor:pointer}
   .spacer{flex:1}
   .loc{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
        font-family:'Oswald',sans-serif;letter-spacing:1px}
   .search{background:var(--slate);border:1px solid rgba(255,255,255,.08);border-radius:8px;
-          padding:8px 12px;color:var(--cream);font-size:13px;width:190px;font-family:'Inter',sans-serif}
+          padding:8px 12px;color:var(--cream);font-size:13px;width:190px;font-family:'Inter',sans-serif;
+          transition:border-color .2s ease,box-shadow .2s ease}
+  .search:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(124,194,66,.18)}
   .search::placeholder{color:var(--muted)}
   .avatar{width:34px;height:34px;border-radius:8px;background:var(--slateLight);
           display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
 
-  /* ---------- Hero ---------- */
-  .hero{max-width:1240px;margin:0 auto;padding:34px 24px 10px}
-  .hero h1{font-family:'Oswald',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.5px}
+  /* ---------- Hero (with parallax glow) ---------- */
+  .hero{position:relative;max-width:1240px;margin:0 auto;padding:52px 24px 14px;overflow:visible}
+  .hero .glow{position:absolute;left:-60px;top:-40px;width:420px;height:420px;z-index:-1;
+              background:radial-gradient(circle,rgba(124,194,66,.16),transparent 62%);
+              filter:blur(6px);will-change:transform}
+  .hero h1{font-family:'Oswald',sans-serif;font-size:44px;font-weight:700;letter-spacing:-.5px}
   .hero h1 span{color:var(--green)}
-  .hero p{color:var(--muted);font-size:15px;margin-top:6px}
+  .hero p{color:var(--muted);font-size:15px;margin-top:8px}
+
+  /* ---------- Stats band (count-up) ---------- */
+  .stats{max-width:1240px;margin:22px auto 0;padding:0 24px;
+         display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .stat{background:var(--slateLight);border:1px solid rgba(255,255,255,.05);border-radius:14px;
+        padding:16px 18px}
+  .stat .num{font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:var(--green);line-height:1}
+  .stat .lab{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:1.2px;color:var(--muted);
+             font-weight:700;margin-top:6px}
 
   /* ---------- Layout: sidebar + main ---------- */
-  .shell{max-width:1240px;margin:0 auto;padding:18px 24px 60px;
+  .shell{max-width:1240px;margin:0 auto;padding:26px 24px 60px;
          display:grid;grid-template-columns:248px 1fr;gap:24px;align-items:start}
-
-  .side{position:sticky;top:84px;display:flex;flex-direction:column;gap:16px}
-  .panel{background:var(--slateLight);border-radius:14px;padding:16px}
+  .side{position:sticky;top:92px;display:flex;flex-direction:column;gap:16px}
+  .panel{background:var(--slateLight);border-radius:14px;padding:16px;
+         border:1px solid rgba(255,255,255,.05)}
   .panel h3{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:1.5px;
             color:var(--muted);font-weight:700;margin-bottom:12px}
   .league{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
           font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;letter-spacing:.5px;
-          color:var(--muted);cursor:pointer;margin-bottom:4px}
-  .league:hover{background:rgba(255,255,255,.04);color:var(--cream)}
+          color:var(--muted);cursor:pointer;margin-bottom:4px;transition:background .18s ease,color .18s ease,transform .18s ease}
+  .league:hover{background:rgba(255,255,255,.04);color:var(--cream);transform:translateX(3px)}
   .league.active{background:var(--green);color:var(--charcoal)}
   .league .em{font-size:15px}
   .league .ct{margin-left:auto;font-size:11px;opacity:.7}
@@ -76,13 +112,15 @@
   .chk input{accent-color:var(--green)}
 
   /* ---------- Team grid ---------- */
-  .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
-  .sec-head h2{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700}
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
+  .sec-head h2{font-family:'Oswald',sans-serif;font-size:23px;font-weight:700}
   .sec-head .sub{color:var(--muted);font-size:13px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px}
   .card{background:var(--slateLight);border:1px solid rgba(255,255,255,.05);border-radius:12px;
-        padding:14px;display:flex;flex-direction:column;gap:10px;transition:transform .12s ease,border-color .12s ease;cursor:pointer}
-  .card:hover{transform:translateY(-3px);border-color:var(--green)}
+        padding:14px;display:flex;flex-direction:column;gap:10px;cursor:pointer;
+        transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+  .card:hover{transform:translateY(-4px);border-color:var(--green);
+              box-shadow:0 14px 34px rgba(0,0,0,.28)}
   .card .top{display:flex;align-items:center;gap:11px}
   .mono{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
         font-family:'Oswald',sans-serif;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}
@@ -94,14 +132,17 @@
   .closest{font-size:11px;color:var(--muted)}
   .closest b{color:var(--cream)}
   .follow{border:1.5px solid var(--muted);background:transparent;color:var(--muted);
-          border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:.5px}
+          border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;
+          font-family:'Oswald',sans-serif;letter-spacing:.5px;transition:all .18s ease}
+  .follow:hover{border-color:var(--green);color:var(--green)}
   .follow.on{background:var(--green);border-color:var(--green);color:var(--charcoal)}
 
   /* ---------- Schedule detail showcase ---------- */
-  .detail{margin-top:46px}
-  .detail-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;margin-top:14px}
+  .detail{margin-top:52px}
+  .detail-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;margin-top:16px}
   .game{background:var(--slateLight);border-left:4px solid var(--green);border-radius:10px;
-        padding:13px 15px;margin-bottom:9px}
+        padding:13px 15px;margin-bottom:9px;transition:transform .18s ease,box-shadow .18s ease}
+  .game:hover{transform:translateX(4px);box-shadow:0 10px 26px rgba(0,0,0,.22)}
   .game.away{border-left-color:var(--amber)}
   .game .gmeta{display:flex;align-items:center;gap:8px;margin-bottom:4px}
   .game .gdate{font-family:'Oswald',sans-serif;font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px}
@@ -113,37 +154,56 @@
   .game .gright{float:right;text-align:right}
   .price{font-family:'Oswald',sans-serif;color:var(--green);font-weight:700;font-size:15px}
 
-  .rail{position:sticky;top:84px;display:flex;flex-direction:column;gap:14px}
-  .map{height:180px;border-radius:14px;background:
-       linear-gradient(135deg,#33454f,#2a3942);border:1px solid rgba(255,255,255,.06);
-       display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;position:relative;overflow:hidden}
+  .rail{position:sticky;top:92px;display:flex;flex-direction:column;gap:14px}
+  .map{height:184px;border-radius:14px;background:linear-gradient(135deg,#33454f,#2a3942);
+       border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;
+       color:var(--muted);font-size:13px;position:relative;overflow:hidden}
   .map .pin{position:absolute;width:16px;height:16px;border-radius:50% 50% 50% 0;
-            background:var(--red);transform:rotate(-45deg)}
-  .vend{display:flex;align-items:center;gap:11px;background:var(--slate);border-radius:9px;padding:9px 11px;margin-bottom:7px}
+            background:var(--red);transform:rotate(-45deg);left:calc(50% - 60px);top:calc(50% - 22px)}
+  .map .pin::after{content:'';position:absolute;inset:0;border-radius:inherit;
+            background:var(--red);animation:pulse 2.2s ease-out infinite}
+  @keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.2);opacity:0}}
+  .vend{display:flex;align-items:center;gap:11px;background:var(--slate);border-radius:9px;
+        padding:9px 11px;margin-bottom:7px;transition:transform .16s ease}
+  .vend:hover{transform:translateX(3px)}
   .vend.best{border:2px solid var(--green);background:rgba(124,194,66,.10)}
-  .vlogo{width:30px;height:30px;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+  .vlogo{width:30px;height:30px;border-radius:6px;background:#fff;display:flex;align-items:center;
+         justify-content:center;overflow:hidden;flex-shrink:0}
   .vlogo img{width:22px;height:22px;object-fit:contain}
   .vend .vname{font-size:13px;font-weight:700}
   .vend .vsub{font-size:10px;color:var(--muted)}
   .vend .go{margin-left:auto;font-family:'Oswald',sans-serif;font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px}
 
-  footer{border-top:1px solid rgba(255,255,255,.06);margin-top:40px}
+  footer{border-top:1px solid rgba(255,255,255,.06);margin-top:44px}
   .fbar{max-width:1240px;margin:0 auto;padding:24px;color:var(--muted);font-size:12px;
         display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 
-  /* Responsive: collapse to single column on smaller widths */
+  /* ---------- Scroll reveal ---------- */
+  .js .reveal{opacity:0;transform:translateY(26px);
+              transition:opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1)}
+  .js .reveal.in{opacity:1;transform:none}
+
   @media (max-width:920px){
     .shell{grid-template-columns:1fr}
     .side{position:static}
     .detail-grid{grid-template-columns:1fr}
+    .stats{grid-template-columns:repeat(2,1fr)}
     nav.tabs,.loc,.search{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    body::before{animation:none}
+    .map .pin::after{animation:none;display:none}
+    .js .reveal{opacity:1;transform:none;transition:none}
+    *{transition:none!important}
   }
 </style>
 </head>
 <body>
+  <div class="progress" id="progress"></div>
   <div class="banner">DESKTOP MOCKUP — static preview only · not wired to live data · mobile/PWA app is unchanged</div>
 
-  <header>
+  <header id="hdr">
     <div class="hbar">
       <div class="logo"><div class="logo-mark">▦</div><div class="logo-txt">ROADGAME</div></div>
       <nav class="tabs">
@@ -158,14 +218,21 @@
     </div>
   </header>
 
-  <div class="hero">
+  <div class="hero reveal">
+    <div class="glow" id="glow"></div>
     <h1>Your team, <span>near you.</span></h1>
     <p>Plan the trip — find games within reach, compare tickets, book the stay.</p>
   </div>
 
+  <div class="stats reveal">
+    <div class="stat"><div class="num" data-count="5">0</div><div class="lab">LEAGUES</div></div>
+    <div class="stat"><div class="num" data-count="189">0</div><div class="lab">TEAMS</div></div>
+    <div class="stat"><div class="num" data-count="12">0</div><div class="lab">GAMES WITHIN 600 MI</div></div>
+    <div class="stat"><div class="num" data-count="19" data-prefix="$">0</div><div class="lab">CHEAPEST TICKET</div></div>
+  </div>
+
   <div class="shell">
-    <!-- Sidebar -->
-    <aside class="side">
+    <aside class="side reveal">
       <div class="panel">
         <h3>LEAGUES</h3>
         <div class="league active"><span class="em">⚾</span> MLB <span class="ct">30</span></div>
@@ -182,23 +249,21 @@
       </div>
     </aside>
 
-    <!-- Main -->
     <main>
-      <div class="sec-head">
+      <div class="sec-head reveal">
         <h2>BROWSE MLB TEAMS</h2>
         <span class="sub">30 teams · sorted by distance from Mountain Home, NC</span>
       </div>
       <div class="grid" id="grid"></div>
 
-      <!-- Schedule detail showcase -->
       <section class="detail">
-        <div class="sec-head">
+        <div class="sec-head reveal">
           <h2>ATLANTA BRAVES</h2>
           <span class="sub">how a schedule looks on desktop — list + sticky detail rail</span>
         </div>
         <div class="detail-grid">
           <div id="games"></div>
-          <div class="rail">
+          <div class="rail reveal">
             <div class="map"><div class="pin"></div>&nbsp;&nbsp;Truist Park · Atlanta, GA</div>
             <div class="panel">
               <h3>FIND TICKETS · BRAVES vs METS</h3>
@@ -227,7 +292,8 @@
   <footer><div class="fbar"><span>RoadGame · desktop concept</span><span>Mountain Home, NC</span></div></footer>
 
 <script>
-  // Tier logic mirrors the app: <100 LOCAL, <400 ROAD TRIP, <900 LONG HAUL, else FLY
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   function tier(d){
     if(d<100) return {l:'LOCAL',c:'#7CC242',b:'rgba(124,194,66,.18)'};
     if(d<400) return {l:'ROAD TRIP',c:'#F2A538',b:'rgba(242,165,56,.15)'};
@@ -250,7 +316,7 @@
   ];
   document.getElementById('grid').innerHTML = teams.map((t,i)=>{
     const tt=tier(t.d);const on=i===0?'on':'';
-    return `<div class="card">
+    return `<div class="card reveal" style="transition-delay:${(i%12)*45}ms">
       <div class="top">
         <div class="mono" style="background:${t.col}">${t.ab}</div>
         <div><div class="name">${t.n}</div><div class="city">${t.c}</div></div>
@@ -272,8 +338,8 @@
     {date:'FRI AUG 20 · 8:05 PM',home:false,match:'@ Cincinnati Reds',sub:'Great American Ball Park · 322 mi',price:'$31'},
     {date:'SAT SEP 04 · 4:10 PM',home:true,match:'vs Philadelphia Phillies',sub:'Truist Park · Atlanta, GA · 165 mi',price:'$28'},
   ];
-  document.getElementById('games').innerHTML = games.map(g=>`
-    <div class="game ${g.home?'':'away'}">
+  document.getElementById('games').innerHTML = games.map((g,i)=>`
+    <div class="game ${g.home?'':'away'} reveal" style="transition-delay:${i*60}ms">
       <div class="gright"><div class="price">${g.price}+</div></div>
       <div class="gmeta">
         <span class="gdate">${g.date}</span>
@@ -283,7 +349,55 @@
       <div class="gsub">${g.sub}</div>
     </div>`).join('');
 
-  // Light interactivity for the mockup
+  // Scroll reveal via IntersectionObserver
+  const revealEls = document.querySelectorAll('.reveal');
+  if(reduce || !('IntersectionObserver' in window)){
+    revealEls.forEach(el=>el.classList.add('in'));
+  } else {
+    const io = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, {threshold:.12, rootMargin:'0px 0px -8% 0px'});
+    revealEls.forEach(el=>io.observe(el));
+  }
+
+  // Count-up stats (runs when the stats band reveals)
+  function countUp(el){
+    const target = +el.dataset.count, prefix = el.dataset.prefix || '';
+    if(reduce){ el.textContent = prefix+target; return; }
+    const dur = 1100, t0 = performance.now();
+    (function step(now){
+      const p = Math.min(1,(now-t0)/dur);
+      const eased = 1-Math.pow(1-p,3);
+      el.textContent = prefix+Math.round(target*eased);
+      if(p<1) requestAnimationFrame(step);
+    })(t0);
+  }
+  const statsBand = document.querySelector('.stats');
+  if(reduce || !('IntersectionObserver' in window)){
+    document.querySelectorAll('.num').forEach(countUp);
+  } else {
+    const so = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ e.target.querySelectorAll('.num').forEach(countUp); so.disconnect(); } });
+    }, {threshold:.4});
+    so.observe(statsBand);
+  }
+
+  // Scroll: progress bar, header shrink, hero glow parallax
+  const progress = document.getElementById('progress');
+  const hdr = document.getElementById('hdr');
+  const glow = document.getElementById('glow');
+  let ticking = false;
+  function onScroll(){
+    const y = window.scrollY;
+    const h = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (h>0 ? (y/h)*100 : 0) + '%';
+    hdr.classList.toggle('scrolled', y > 12);
+    if(!reduce && glow) glow.style.transform = 'translateY(' + (y*0.18) + 'px)';
+    ticking = false;
+  }
+  window.addEventListener('scroll', ()=>{ if(!ticking){ requestAnimationFrame(onScroll); ticking = true; } }, {passive:true});
+  onScroll();
+
   document.querySelectorAll('.league').forEach(el=>el.onclick=()=>{
     document.querySelector('.league.active')?.classList.remove('active');
     el.classList.add('active');
