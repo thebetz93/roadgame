@@ -479,19 +479,72 @@ function Placeholder({ title }) {
   );
 }
 
-export default function DesktopApp({ bag }) {
-  const { view, activeTeam, setView, toast } = bag;
+function HomeView({ bag }) {
+  const { user, setView, setActiveTeam, setAuthOpen } = bag;
+  const browse = () => { setActiveTeam(null); setView("teams"); };
+  const features = [
+    { icon: "📍", title: "Games near you", body: "Every pro & college game sorted by real distance from your city — local, road trip, long haul, or fly." },
+    { icon: "🎟️", title: "Compare tickets", body: "See the lowest prices across SeatGeek, Ticketmaster, and more, side by side for each game." },
+    { icon: "🧭", title: "Plan the whole trip", body: "Drive or fly estimates, hotels near the venue, and a local eat/drink/see city guide." },
+  ];
+  return (
+    <div>
+      <section style={{ padding: "64px 0 40px", maxWidth: 780 }}>
+        <div className="oswald" style={{ fontSize: 12, letterSpacing: 2, color: BRAND.green, fontWeight: 700, marginBottom: 14 }}>PRO &amp; COLLEGE SPORTS ROAD TRIPS</div>
+        <h1 className="oswald" style={{ fontSize: 52, fontWeight: 700, letterSpacing: -1, lineHeight: 1.02 }}>
+          Your team,<br /><span style={{ color: BRAND.green }}>near you.</span>
+        </h1>
+        <p style={{ fontSize: 17, color: BRAND.muted, marginTop: 16, lineHeight: 1.5, maxWidth: 560 }}>
+          RoadGame finds the games within reach of your city, compares ticket prices, and helps you plan the trip — so you can go see them live.
+        </p>
+        <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
+          <button onClick={browse} className="oswald" style={{ background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 10, padding: "14px 28px", fontSize: 14, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>BROWSE TEAMS →</button>
+          {user
+            ? <button onClick={() => setView("following")} className="oswald" style={{ background: "transparent", color: BRAND.cream, border: `1.5px solid ${BRAND.muted}`, borderRadius: 10, padding: "14px 28px", fontSize: 14, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>MY FOLLOWING</button>
+            : <button onClick={() => setAuthOpen(true)} className="oswald" style={{ background: "transparent", color: BRAND.cream, border: `1.5px solid ${BRAND.muted}`, borderRadius: 10, padding: "14px 28px", fontSize: 14, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>SIGN IN</button>}
+        </div>
+        <div style={{ display: "flex", gap: 28, marginTop: 34, color: BRAND.muted, fontSize: 13 }}>
+          <div><b className="oswald" style={{ color: BRAND.cream, fontSize: 20 }}>5</b> leagues</div>
+          <div><b className="oswald" style={{ color: BRAND.cream, fontSize: 20 }}>180+</b> teams</div>
+          <div><b className="oswald" style={{ color: BRAND.cream, fontSize: 20 }}>NFL · CFB · MLB · NBA · NHL</b></div>
+        </div>
+      </section>
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 16, paddingBottom: 40 }}>
+        {features.map(f => (
+          <div key={f.title} style={{ background: BRAND.slateLight, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: 22 }}>
+            <div style={{ fontSize: 26 }}>{f.icon}</div>
+            <div className="oswald" style={{ fontSize: 16, fontWeight: 700, marginTop: 10, letterSpacing: 0.3 }}>{f.title}</div>
+            <div style={{ fontSize: 13, color: BRAND.muted, marginTop: 6, lineHeight: 1.5 }}>{f.body}</div>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
 
-  // Land the desktop preview on Browse so the league sidebar + grid populate.
+export default function DesktopApp({ bag }) {
+  const { view, activeTeam, setView, toast, user } = bag;
+  const KNOWN = ["home", "teams", "following", "profile"];
+
+  // Signed-out visitors land on the Home page; keep any unknown view sane.
   useEffect(() => {
-    if (!activeTeam && view !== "teams" && view !== "following" && view !== "profile") setView("teams");
+    if (activeTeam) return;
+    if (!user && (view === "following" || view === "profile")) setView("home");
+    else if (!KNOWN.includes(view)) setView("teams");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const goHome = () => { bag.setActiveTeam(null); setView("teams"); };
+  // Once signed in, don't strand the user on the marketing Home page.
+  useEffect(() => {
+    if (user && view === "home") setView("following");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const goHome = () => { bag.setActiveTeam(null); setView("home"); };
 
   let content;
   if (activeTeam) content = <ScheduleView bag={bag} />;
+  else if (view === "home") content = <HomeView bag={bag} />;
   else if (view === "following") content = <FollowingView bag={bag} />;
   else if (view === "profile" && bag.user) content = <ProfileView bag={bag} />;
   else content = <BrowseView bag={bag} />;
