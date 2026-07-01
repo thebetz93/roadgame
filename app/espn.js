@@ -162,6 +162,17 @@ function parseEvent(event, ourTeam) {
   };
 }
 
+// Team logo from ESPN's public CDN, keyed by the abbreviation we already store.
+// Pro leagues map cleanly; college football uses numeric IDs on ESPN, so cfb
+// (and any unknown team) returns null and callers fall back to a monogram.
+const ESPN_LOGO_SPORT = { nfl: "nfl", nba: "nba", mlb: "mlb", nhl: "nhl" };
+export function teamLogoUrl(team, league) {
+  const sport = ESPN_LOGO_SPORT[league];
+  const abbr = ABBR[team];
+  if (!sport || !abbr) return null;
+  return `https://a.espncdn.com/i/teamlogos/${sport}/500/${abbr}.png`;
+}
+
 export async function fetchTeamSchedule(teamName, league) {
   const path = SPORT[league];
   const abbr = ABBR[teamName];
