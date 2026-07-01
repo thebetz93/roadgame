@@ -590,8 +590,13 @@ export default function DesktopApp({ bag }) {
 
   const goHome = () => { bag.setActiveTeam(null); setView("home"); };
 
-  const contentKey = `${view}:${activeTeam?.team || ""}:${bag.activeLeague}`;
-  useScrollReveal(contentKey);
+  // View key drives the fade on navigation. Reveal key ALSO changes when async
+  // content lands (schedule finishing loading, browse games arriving) so the
+  // reveal observer re-runs and picks up rows that render after the initial
+  // paint — otherwise they'd stay stuck at opacity 0.
+  const viewKey = `${view}:${activeTeam?.team || ""}:${bag.activeLeague}`;
+  const revealKey = `${viewKey}:${bag.scheduleLoading ? "L" : "R"}:${bag.visibleSchedule?.length ?? 0}:${bag.browseLeagueGames?.[bag.activeLeague] ? "B" : ""}`;
+  useScrollReveal(revealKey);
 
   let content;
   if (activeTeam) content = <ScheduleView bag={bag} />;
@@ -605,7 +610,7 @@ export default function DesktopApp({ bag }) {
       <style>{DESKTOP_CSS}</style>
       <div className="d-layer">
         <Header bag={bag} goHome={goHome} />
-        <div key={contentKey} className="d-fade" style={{ maxWidth: 1240, margin: "0 auto", padding: "26px 24px 60px" }}>
+        <div key={viewKey} className="d-fade" style={{ maxWidth: 1240, margin: "0 auto", padding: "26px 24px 60px" }}>
           {content}
         </div>
       </div>
