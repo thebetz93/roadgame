@@ -3,6 +3,10 @@ import { fetchTeamSchedule } from "./espn";
 import { VENUES } from "./venues";
 import { findCity, geocodeCity, reverseGeocode } from "./cities";
 import { sendOtpCode, verifyEmailOtp, signInWithGoogle, getCurrentUser, getMyProfile, upsertMyProfile, signOutSupabase, supabase } from "./supabase";
+import { BRAND } from "./lib/brand";
+import { LEAGUES, LEAGUE_POPULARITY, leagueInSeason, SORTED_LEAGUES, TEAMS_BY_LEAGUE } from "./lib/leagues";
+import { haversine, fmtDate, fmtTime, relInfo, travelTier, modesFor } from "./lib/helpers";
+import VendorLogo from "./components/VendorLogo";
 
 // ─── Desktop layout plumbing (PR 1 of the desktop build) ────────────────────
 // The desktop UI activates at >= DESKTOP_MIN px, but stays gated behind
@@ -40,21 +44,7 @@ function expediaAffiliate(destinationUrl) {
 }
 
 // ─── BRAND PALETTE (matched to logo) ──────────────────────────────────────────
-const BRAND = {
-  slate:      "#3A4A54",  // page background
-  slateDark:  "#2C3A42",  // header, expanded panels
-  slateLight: "#4A5E6A",  // cards
-  cream:      "#FFFFFF",  // primary text (white)
-  creamDim:   "#E8E2D8",  // muted cream
-  green:      "#7CC242",  // signature lime green
-  greenDark:  "#5FA82E",  // deeper green
-  greenGlow:  "rgba(124,194,66,0.25)",
-  charcoal:   "#1F2A30",  // text on cream
-  muted:      "#A8BDC8",  // secondary text on slate
-  white:      "#FFFFFF",
-  red:        "#E84545",  // alerts/urgent
-  amber:      "#F2A538",  // road trip tier
-};
+// BRAND tokens moved to ./lib/brand
 
 // ─── STORAGE ABSTRACTION ──────────────────────────────────────────────────────
 const memStore = {};
@@ -89,15 +79,7 @@ const storage = {
   },
 };
 
-// ─── HAVERSINE ────────────────────────────────────────────────────────────────
-function haversine(lat1, lon1, lat2, lon2) {
-  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
-  const R = 3959;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-}
+// haversine moved to ./lib/helpers
 
 // VENUES imported from ./venues
 
@@ -229,75 +211,9 @@ const DEFAULT_GUIDE = {
 
 function guideFor(city) { return CITY_GUIDES[city] || DEFAULT_GUIDE; }
 
-const LEAGUES = [
-  { id: "nfl", name: "NFL", emoji: "🏈", season: "Sep–Jan" },
-  { id: "nba", name: "NBA", emoji: "🏀", season: "Oct–Jun" },
-  { id: "mlb", name: "MLB", emoji: "⚾", season: "Mar–Oct" },
-  { id: "nhl", name: "NHL", emoji: "🏒", season: "Oct–Jun" },
-  { id: "cfb", name: "CFB", emoji: "🏈", season: "Aug–Jan" },
-];
-
-// US popularity ranking — lower = more popular (tiebreaker when 2+ leagues are in-season)
-const LEAGUE_POPULARITY = { nfl: 1, mlb: 2, cfb: 3, nhl: 4, nba: 5 };
-
-function leagueInSeason(id) {
-  const m = new Date().getMonth(); // 0=Jan … 11=Dec
-  if (id === "nfl") return m >= 8 || m <= 1;   // Sep–Feb
-  if (id === "mlb") return m >= 2 && m <= 9;   // Mar–Oct
-  if (id === "nba") return m >= 9 || m <= 4;   // Oct–May (playoffs end before June)
-  if (id === "nhl") return m >= 9 || m <= 4;   // Oct–May (Stanley Cup by end of May)
-  if (id === "cfb") return m >= 7 || m <= 0;   // Aug–Jan
-  return false;
-}
-
-const SORTED_LEAGUES = [...LEAGUES].sort((a, b) => {
-  const aIn = leagueInSeason(a.id) ? 0 : 1;
-  const bIn = leagueInSeason(b.id) ? 0 : 1;
-  if (aIn !== bIn) return aIn - bIn;
-  return (LEAGUE_POPULARITY[a.id] ?? 99) - (LEAGUE_POPULARITY[b.id] ?? 99);
-});
-
-const TEAMS_BY_LEAGUE = {
-  nfl: ["Arizona Cardinals","Atlanta Falcons","Baltimore Ravens","Buffalo Bills","Carolina Panthers","Chicago Bears","Cincinnati Bengals","Cleveland Browns","Dallas Cowboys","Denver Broncos","Detroit Lions","Green Bay Packers","Houston Texans","Indianapolis Colts","Jacksonville Jaguars","Kansas City Chiefs","Las Vegas Raiders","Los Angeles Chargers","Los Angeles Rams","Miami Dolphins","Minnesota Vikings","New England Patriots","New Orleans Saints","New York Giants","New York Jets","Philadelphia Eagles","Pittsburgh Steelers","San Francisco 49ers","Seattle Seahawks","Tampa Bay Buccaneers","Tennessee Titans","Washington Commanders"],
-  nba: ["Atlanta Hawks","Boston Celtics","Brooklyn Nets","Charlotte Hornets","Chicago Bulls","Cleveland Cavaliers","Dallas Mavericks","Denver Nuggets","Detroit Pistons","Golden State Warriors","Houston Rockets","Indiana Pacers","LA Clippers","Los Angeles Lakers","Memphis Grizzlies","Miami Heat","Milwaukee Bucks","Minnesota Timberwolves","New Orleans Pelicans","New York Knicks","Oklahoma City Thunder","Orlando Magic","Philadelphia 76ers","Phoenix Suns","Portland Trail Blazers","Sacramento Kings","San Antonio Spurs","Toronto Raptors","Utah Jazz","Washington Wizards"],
-  mlb: ["Arizona Diamondbacks","Atlanta Braves","Baltimore Orioles","Boston Red Sox","Chicago Cubs","Chicago White Sox","Cincinnati Reds","Cleveland Guardians","Colorado Rockies","Detroit Tigers","Houston Astros","Kansas City Royals","Los Angeles Angels","Los Angeles Dodgers","Miami Marlins","Milwaukee Brewers","Minnesota Twins","New York Mets","New York Yankees","Athletics","Philadelphia Phillies","Pittsburgh Pirates","San Diego Padres","San Francisco Giants","Seattle Mariners","St. Louis Cardinals","Tampa Bay Rays","Texas Rangers","Toronto Blue Jays","Washington Nationals"],
-  nhl: ["Anaheim Ducks","Boston Bruins","Buffalo Sabres","Calgary Flames","Carolina Hurricanes","Chicago Blackhawks","Colorado Avalanche","Columbus Blue Jackets","Dallas Stars","Detroit Red Wings","Edmonton Oilers","Florida Panthers","Los Angeles Kings","Minnesota Wild","Montreal Canadiens","Nashville Predators","New Jersey Devils","New York Islanders","New York Rangers","Ottawa Senators","Philadelphia Flyers","Pittsburgh Penguins","San Jose Sharks","Seattle Kraken","St. Louis Blues","Tampa Bay Lightning","Toronto Maple Leafs","Utah Mammoth","Vancouver Canucks","Vegas Golden Knights","Washington Capitals","Winnipeg Jets"],
-  cfb: ["Alabama Crimson Tide","Arkansas Razorbacks","Auburn Tigers","Florida Gators","Georgia Bulldogs","Kentucky Wildcats","LSU Tigers","Mississippi State Bulldogs","Missouri Tigers","Oklahoma Sooners","Ole Miss Rebels","South Carolina Gamecocks","Tennessee Volunteers","Texas Longhorns","Texas A&M Aggies","Vanderbilt Commodores","Illinois Fighting Illini","Indiana Hoosiers","Iowa Hawkeyes","Maryland Terrapins","Michigan Wolverines","Michigan State Spartans","Minnesota Golden Gophers","Nebraska Cornhuskers","Northwestern Wildcats","Ohio State Buckeyes","Penn State Nittany Lions","Purdue Boilermakers","Rutgers Scarlet Knights","Wisconsin Badgers","UCLA Bruins","USC Trojans","Oregon Ducks","Washington Huskies","Arizona Wildcats","Arizona State Sun Devils","Baylor Bears","BYU Cougars","Cincinnati Bearcats","Colorado Buffaloes","Houston Cougars","Iowa State Cyclones","Kansas Jayhawks","Kansas State Wildcats","Oklahoma State Cowboys","TCU Horned Frogs","Texas Tech Red Raiders","UCF Knights","Utah Utes","West Virginia Mountaineers","Boston College Eagles","Clemson Tigers","Duke Blue Devils","Florida State Seminoles","Georgia Tech Yellow Jackets","Louisville Cardinals","Miami Hurricanes","NC State Wolfpack","North Carolina Tar Heels","Notre Dame Fighting Irish","Pittsburgh Panthers","Syracuse Orange","Virginia Cavaliers","Virginia Tech Hokies","Wake Forest Demon Deacons","Stanford Cardinal","California Golden Bears"],
-};
-
-function fmtDate(iso) { return new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
-function fmtTime(iso) { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
-// Human-friendly relative date, e.g. "Today", "Tomorrow", "This Sat", "In 3 wks".
-// Returns { text, soon } where soon = within a week. Null for past dates.
-function relInfo(iso) {
-  const now = new Date();
-  const d = new Date(iso);
-  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const b = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const days = Math.round((b - a) / 86400000);
-  if (days < 0) return null;
-  let text;
-  if (days === 0) text = "Today";
-  else if (days === 1) text = "Tomorrow";
-  else if (days < 7) text = `This ${d.toLocaleDateString("en-US", { weekday: "short" })}`;
-  else if (days < 14) text = `Next ${d.toLocaleDateString("en-US", { weekday: "short" })}`;
-  else if (days < 60) text = `In ${Math.round(days / 7)} wks`;
-  else text = `In ${Math.round(days / 30)} mo`;
-  return { text, soon: days <= 7 };
-}
-function travelTier(d) {
-  if (d == null) return { label: "AWAY", color: BRAND.muted, bg: "rgba(154,165,173,0.12)" };
-  if (d < 100) return { label: "LOCAL", color: BRAND.green, bg: BRAND.greenGlow };
-  if (d < 400) return { label: "ROAD TRIP", color: BRAND.amber, bg: "rgba(242,165,56,0.15)" };
-  if (d < 900) return { label: "LONG HAUL", color: "#E87A3A", bg: "rgba(232,122,58,0.15)" };
-  return { label: "FLY", color: "#9BB4E8", bg: "rgba(155,180,232,0.15)" };
-}
-function modesFor(d) {
-  if (d == null) return [];
-  if (d < 80) return ["drive"];
-  if (d < 450) return ["drive", "train"];
-  return ["fly", "drive"];
-}
+// LEAGUES, LEAGUE_POPULARITY, leagueInSeason, SORTED_LEAGUES, TEAMS_BY_LEAGUE
+// moved to ./lib/leagues. fmtDate, fmtTime, relInfo, travelTier, modesFor moved
+// to ./lib/helpers.
 const TRAVEL = {
   fly:   { icon: "✈", label: "Fly",   color: "#9BB4E8" },
   drive: { icon: "🚗", label: "Drive", color: BRAND.green },
@@ -2018,42 +1934,7 @@ function Stat({ value, label, accent = BRAND.cream }) {
 // Real vendor logo loaded from a favicon/logo service in the user's browser.
 // Falls back through services, then to the original brand-color letter tile if
 // none resolve — so it degrades gracefully and never shows a broken image.
-function VendorLogo({ domain, name, color, size = 30 }) {
-  const [step, setStep] = useState(0);
-  const sources = [
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-  ];
-  const radius = size >= 36 ? 8 : 6;
-
-  if (step >= sources.length) {
-    return (
-      <div className="oswald" style={{
-        width: size, height: size, borderRadius: radius, background: color, color: "#fff",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: size >= 36 ? 14 : 12, fontWeight: 700, flexShrink: 0,
-      }}>{name[0]}</div>
-    );
-  }
-
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: radius, background: "#fff",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      overflow: "hidden", flexShrink: 0,
-    }}>
-      <img
-        src={sources[step]}
-        alt={`${name} logo`}
-        width={size - 8}
-        height={size - 8}
-        loading="lazy"
-        onError={() => setStep(s => s + 1)}
-        style={{ width: size - 8, height: size - 8, objectFit: "contain", display: "block" }}
-      />
-    </div>
-  );
-}
+// VendorLogo moved to ./components/VendorLogo
 
 function AlertCard({ alert: a, onTap, urgent }) {
   const tier = travelTier(a.dist);
