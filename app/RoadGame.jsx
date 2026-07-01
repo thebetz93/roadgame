@@ -780,6 +780,7 @@ const [schedule, setSchedule] = useState([]);
         schedule, visibleSchedule, scheduleLoading, scheduleError,
         reachableCount, leagueMeta, expanded, setExpanded,
         travelTab, setTravelTab,
+        alerts, alertRadius, setAuthOpen,
       }} />
     );
   }
