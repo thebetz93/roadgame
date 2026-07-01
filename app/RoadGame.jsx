@@ -7,6 +7,7 @@ import { BRAND } from "./lib/brand";
 import { LEAGUES, LEAGUE_POPULARITY, leagueInSeason, SORTED_LEAGUES, TEAMS_BY_LEAGUE } from "./lib/leagues";
 import { haversine, fmtDate, fmtTime, relInfo, travelTier, modesFor } from "./lib/helpers";
 import VendorLogo from "./components/VendorLogo";
+import DesktopApp from "./components/desktop/DesktopApp";
 
 // ─── Desktop layout plumbing (PR 1 of the desktop build) ────────────────────
 // The desktop UI activates at >= DESKTOP_MIN px, but stays gated behind
@@ -31,6 +32,17 @@ function useIsDesktop() {
     };
   }, []);
   return isDesktop;
+}
+
+// Opt-in preview: ?desktop=1 forces the desktop layout on wide screens even
+// while DESKTOP_ENABLED is off, so the WIP can be reviewed on the live site
+// without exposing it to everyone. Read post-mount to avoid hydration mismatch.
+function useDesktopPreviewFlag() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    try { setOn(new URLSearchParams(window.location.search).has("desktop")); } catch {}
+  }, []);
+  return on;
 }
 
 // ─── AFFILIATE IDs ────────────────────────────────────────────────────────────
@@ -266,7 +278,8 @@ export default function RoadGame() {
   // Desktop layout gate — no-op until DESKTOP_ENABLED is flipped on. Exposed as
   // a data attribute so the breakpoint can be verified in devtools meanwhile.
   const isDesktop = useIsDesktop();
-  const useDesktopLayout = DESKTOP_ENABLED && isDesktop;
+  const desktopPreview = useDesktopPreviewFlag();
+  const useDesktopLayout = (DESKTOP_ENABLED || desktopPreview) && isDesktop;
 
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("signin");
@@ -885,6 +898,22 @@ const [schedule, setSchedule] = useState([]);
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ─── DESKTOP LAYOUT (>=1280px, gated) ───
+  // All hooks above have already run, so the mobile data pipeline (schedule,
+  // browse-games, alerts, persistence) stays live; only presentation swaps.
+  if (useDesktopLayout) {
+    return (
+      <DesktopApp bag={{
+        view, setView, activeTeam, setActiveTeam,
+        activeLeague, setActiveLeague, search, setSearch,
+        maxDist, setMaxDist, nearbyOnly, setNearbyOnly,
+        browseLeagueGames, browseLeagueLoading,
+        userLat, userLng, userCity, user, following,
+        isFollowing, toggleFollow, openSchedule, toast,
+      }} />
     );
   }
 
