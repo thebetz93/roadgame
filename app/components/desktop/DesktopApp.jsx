@@ -24,7 +24,7 @@ function monoColor(team) {
 }
 
 function Header({ bag }) {
-  const { view, setView, setActiveTeam, search, setSearch, userCity, user } = bag;
+  const { view, setView, setActiveTeam, search, setSearch, userCity, user, setAuthOpen } = bag;
   const inits = ((user?.name || user?.email || "?").trim()[0] || "?").toUpperCase();
   const go = (v) => { setActiveTeam(null); setView(v); };
   const tab = (id, label) => (
@@ -57,7 +57,7 @@ function Header({ bag }) {
           background: BRAND.slate, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 8,
           padding: "8px 12px", color: BRAND.cream, fontSize: 13, width: 190, fontFamily: "'Inter',sans-serif", outline: "none",
         }} />
-        <div onClick={() => setView("profile")} className="oswald" style={{
+        <div onClick={() => user ? setView("profile") : setAuthOpen(true)} className="oswald" style={{
           width: 34, height: 34, borderRadius: 8, background: BRAND.slateLight, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13,
         }}>{inits}</div>
@@ -349,6 +349,115 @@ function FollowingView({ bag }) {
   );
 }
 
+function Card({ title, children }) {
+  return (
+    <div style={{ background: BRAND.slateLight, borderRadius: 14, padding: 18, border: "1px solid rgba(255,255,255,0.05)" }}>
+      <div className="oswald" style={{ fontSize: 11, letterSpacing: 1.5, color: BRAND.muted, fontWeight: 700, marginBottom: 14 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function ProfileView({ bag }) {
+  const {
+    user, userCity, setView, preProfileView, signOut, enablePush, pushGranted,
+    editingLocation, setEditingLocation, newCity, setNewCity, setNewCoords,
+    saveNewLocation, detectNewLocation,
+    alertsEnabled, setAlertsEnabled, alertRadius, setAlertRadius,
+    following, alerts, weekAlerts,
+  } = bag;
+  const hasNotif = typeof window !== "undefined" && "Notification" in window;
+  const denied = hasNotif && Notification.permission === "denied";
+
+  return (
+    <main style={{ maxWidth: 760 }}>
+      <button onClick={() => setView(preProfileView)} className="oswald" style={{ background: BRAND.slateLight, border: "none", borderRadius: 7, padding: "7px 13px", color: BRAND.cream, fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", marginBottom: 18 }}>← BACK</button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 22 }}>
+        <div className="oswald" style={{ width: 62, height: 62, borderRadius: 15, background: BRAND.green, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 800, color: BRAND.charcoal }}>{(user.name || user.email || "?")[0].toUpperCase()}</div>
+        <div>
+          <div className="oswald" style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.3 }}>{(user.name || user.email || "User").toUpperCase()}</div>
+          <div style={{ fontSize: 13, color: BRAND.muted }}>{user.email}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+        <Card title="YOUR LOCATION">
+          {!editingLocation ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{userCity}</div>
+                <div style={{ fontSize: 11, color: BRAND.muted, marginTop: 2 }}>All distances calculated from here</div>
+              </div>
+              <button onClick={() => { setEditingLocation(true); setNewCity(""); setNewCoords(null); }} className="oswald" style={{ background: "transparent", border: `1.5px solid ${BRAND.green}`, color: BRAND.green, borderRadius: 7, padding: "6px 12px", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>CHANGE</button>
+            </div>
+          ) : (
+            <div>
+              <input type="text" value={newCity} onChange={e => { setNewCity(e.target.value); setNewCoords(null); }} placeholder="Charlotte, NC" onKeyDown={e => e.key === "Enter" && saveNewLocation()} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, background: BRAND.slateDark, border: `1.5px solid rgba(255,255,255,0.1)`, color: BRAND.cream, fontSize: 14, outline: "none", marginBottom: 8, boxSizing: "border-box", fontFamily: "'Inter',sans-serif" }} />
+              <button type="button" onClick={detectNewLocation} className="oswald" style={{ background: "transparent", color: BRAND.muted, border: `1px solid ${BRAND.muted}`, borderRadius: 7, padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer", width: "100%", marginBottom: 10 }}>📍 USE MY CURRENT LOCATION</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { setEditingLocation(false); setNewCity(""); setNewCoords(null); }} className="oswald" style={{ flex: 1, background: "transparent", border: `1.5px solid ${BRAND.muted}`, color: BRAND.muted, borderRadius: 7, padding: 8, fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>CANCEL</button>
+                <button onClick={saveNewLocation} className="oswald" style={{ flex: 1, background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 7, padding: 8, fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>SAVE</button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card title="ALERT SETTINGS">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Weekly alerts</div>
+              <div style={{ fontSize: 11, color: BRAND.muted }}>Notify me when teams play nearby</div>
+            </div>
+            <button onClick={() => setAlertsEnabled(!alertsEnabled)} style={{ width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer", background: alertsEnabled ? BRAND.green : BRAND.slateDark, position: "relative" }}>
+              <div style={{ position: "absolute", top: 2, left: alertsEnabled ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: BRAND.cream, transition: "left 0.15s" }} />
+            </button>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+            <span style={{ fontSize: 12, color: BRAND.muted }}>Alert radius</span>
+            <span className="oswald" style={{ fontSize: 13, fontWeight: 700, color: BRAND.green }}>{alertRadius} MI</span>
+          </div>
+          <input type="range" min={50} max={1000} step={25} value={alertRadius} onChange={e => setAlertRadius(Number(e.target.value))} disabled={!alertsEnabled} style={{ width: "100%", accentColor: BRAND.green, opacity: alertsEnabled ? 1 : 0.3 }} />
+          {alertsEnabled && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Push notifications</div>
+                  <div style={{ fontSize: 11, color: BRAND.muted }}>{pushGranted ? "Active — morning reminder on game week" : "Get notified even when the app is closed"}</div>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: pushGranted ? BRAND.green : BRAND.muted }}>{pushGranted ? "ON" : "OFF"}</div>
+              </div>
+              {!pushGranted && hasNotif && !denied && (
+                <button onClick={enablePush} className="oswald" style={{ marginTop: 10, width: "100%", padding: 9, background: BRAND.green, color: BRAND.charcoal, border: "none", borderRadius: 7, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>ENABLE PUSH NOTIFICATIONS</button>
+              )}
+              {denied && <div style={{ fontSize: 10, color: BRAND.red, marginTop: 8 }}>Notifications blocked in browser settings — enable them to turn this on.</div>}
+            </div>
+          )}
+        </Card>
+
+        <Card title="YOUR STATS">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            {[
+              { value: following.length, label: "TEAMS", accent: BRAND.cream, target: "teams" },
+              { value: alerts.length, label: "ALERTS", accent: BRAND.green, target: "following" },
+              { value: weekAlerts.length, label: "THIS WEEK", accent: weekAlerts.length > 0 ? BRAND.red : BRAND.cream, target: "following" },
+            ].map(({ value, label, accent, target }) => (
+              <button key={label} onClick={() => setView(target)} style={{ background: BRAND.slateDark, borderRadius: 8, padding: "10px 12px", border: "none", cursor: "pointer", textAlign: "left" }}>
+                <div className="oswald" style={{ fontSize: 9, color: BRAND.muted, letterSpacing: 1.2, fontWeight: 700 }}>{label}</div>
+                <div className="oswald" style={{ fontSize: 22, fontWeight: 700, color: accent, marginTop: 2 }}>{value}</div>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <div style={{ display: "flex", alignItems: "flex-end" }}>
+          <button onClick={signOut} className="oswald" style={{ width: "100%", padding: 13, borderRadius: 8, border: `1.5px solid ${BRAND.red}`, background: "transparent", color: BRAND.red, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>SIGN OUT</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function Placeholder({ title }) {
   return (
     <main style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 320 }}>
@@ -373,7 +482,7 @@ export default function DesktopApp({ bag }) {
   let content;
   if (activeTeam) content = <ScheduleView bag={bag} />;
   else if (view === "following") content = <FollowingView bag={bag} />;
-  else if (view === "profile") content = <Placeholder title="YOUR ACCOUNT" />;             // PR5
+  else if (view === "profile" && bag.user) content = <ProfileView bag={bag} />;
   else content = <BrowseView bag={bag} />;
 
   return (
