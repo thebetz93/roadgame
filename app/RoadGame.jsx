@@ -504,6 +504,31 @@ async function saveNewLocation() {
     setUser(null); setFollowing([]); setActiveTeam(null); setView("following");
   }
 
+  // Request notification permission, subscribe, and register with the backend.
+  // Shared by the mobile profile and the desktop account view.
+  async function enablePush() {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return;
+    setPushGranted(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+      showToast("Push notifications enabled!");
+    } catch {}
+  }
+
   function toggleFollow(team, league) {
     if (!user) { setAuthOpen(true); return; }
     const exists = following.find(f => f.team === team && f.league === league);
@@ -781,6 +806,10 @@ const [schedule, setSchedule] = useState([]);
         reachableCount, leagueMeta, expanded, setExpanded,
         travelTab, setTravelTab,
         alerts, alertRadius, setAuthOpen,
+        preProfileView, signOut, enablePush, pushGranted,
+        editingLocation, setEditingLocation, newCity, setNewCity, setNewCoords,
+        saveNewLocation, detectNewLocation,
+        alertsEnabled, setAlertsEnabled, setAlertRadius, weekAlerts,
       }} />
     );
   }
@@ -1316,28 +1345,7 @@ const [schedule, setSchedule] = useState([]);
                   </div>
                 </div>
                 {!pushGranted && ("Notification" in window) && Notification.permission !== "denied" && (
-                  <button onClick={async () => {
-                    const perm = await Notification.requestPermission();
-                    if (perm !== "granted") return;
-                    setPushGranted(true);
-                    try {
-                      const reg = await navigator.serviceWorker.ready;
-                      const sub = await reg.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-                      });
-                      const { data: { session } } = await supabase.auth.getSession();
-                      await fetch("/api/push/subscribe", {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-                        },
-                        body: JSON.stringify({ subscription: sub.toJSON() }),
-                      });
-                      showToast("Push notifications enabled!");
-                    } catch {}
-                  }} className="oswald" style={{
+                  <button onClick={enablePush} className="oswald" style={{
                     marginTop: 10, width: "100%", padding: "9px",
                     background: BRAND.green, color: BRAND.charcoal,
                     border: "none", borderRadius: 7, cursor: "pointer",
