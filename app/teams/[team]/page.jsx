@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { resolveTeamSlug, slugifyTeam } from "../../lib/slug";
+import { resolveTeamSlug, slugifyTeam, gameSlug } from "../../lib/slug";
 import { fetchTeamSchedule, teamLogoUrl } from "../../espn";
 import { VENUES } from "../../venues";
 import { LEAGUES } from "../../lib/leagues";
@@ -92,15 +92,17 @@ export default async function TeamPage({ params }) {
         ) : (
           <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
             {games.map(g => (
-              <li key={g.id} style={{
-                background: BRAND.slateLight, borderLeft: `4px solid ${g.isHome ? BRAND.green : BRAND.amber}`,
-                borderRadius: 10, padding: "12px 14px",
-              }}>
-                <div className="oswald" style={{ fontSize: 11, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>
-                  {fmtDate(g.dateISO)} · {g.isHome ? "HOME" : "AWAY"}
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{g.isHome ? `${team} vs ${g.away}` : `${team} @ ${g.home}`}</div>
-                <div style={{ fontSize: 12, color: BRAND.muted, marginTop: 1 }}>{g.venue}{g.city ? ` · ${g.city}` : ""}</div>
+              <li key={g.id}>
+                <Link href={`/games/${gameSlug(slug, g.id)}`} style={{
+                  display: "block", background: BRAND.slateLight, borderLeft: `4px solid ${g.isHome ? BRAND.green : BRAND.amber}`,
+                  borderRadius: 10, padding: "12px 14px",
+                }}>
+                  <div className="oswald" style={{ fontSize: 11, color: BRAND.green, fontWeight: 700, letterSpacing: 1 }}>
+                    {fmtDate(g.dateISO)} · {g.isHome ? "HOME" : "AWAY"}
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, color: BRAND.cream }}>{g.isHome ? `${team} vs ${g.away}` : `${team} @ ${g.home}`}</div>
+                  <div style={{ fontSize: 12, color: BRAND.muted, marginTop: 1 }}>{g.venue}{g.city ? ` · ${g.city}` : ""}</div>
+                </Link>
               </li>
             ))}
           </ul>
