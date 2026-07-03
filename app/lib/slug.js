@@ -37,3 +37,19 @@ export function resolveTeamSlug(slug) {
 export function allTeams() {
   return Object.entries(TEAM_BY_SLUG).map(([slug, v]) => ({ slug, ...v }));
 }
+
+// Game slug = "<team-slug>-<espnId>", e.g. "atlanta-braves-401581". Encoding the
+// team lets the game page reuse the proven schedule parser (fetchTeamSchedule)
+// instead of a separate single-game endpoint. The espnId is the trailing digits.
+export function gameSlug(teamSlugStr, gameId) {
+  const espnId = String(gameId).replace(/^espn-/, "");
+  return `${teamSlugStr}-${espnId}`;
+}
+
+export function parseGameSlug(slug) {
+  const m = /^(.*)-(\d+)$/.exec(slug || "");
+  if (!m) return null;
+  const resolved = resolveTeamSlug(m[1]);
+  if (!resolved) return null;
+  return { ...resolved, teamSlug: m[1], espnId: m[2], gameId: `espn-${m[2]}` };
+}
