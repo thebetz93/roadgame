@@ -39,7 +39,10 @@ export async function generateMetadata({ params }) {
   const dateStr = new Date(game.dateISO).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
   const title = `${matchup} Tickets — ${dateStr} | RoadGame`;
   const description = `${matchup} (${leagueName}) on ${dateStr} at ${game.venue}, ${game.city}. Compare ticket prices and see how far the game is from your city on RoadGame.`;
-  const url = `${SITE}/games/${gameId}`;
+  // Canonicalize to the home team's slug so a game reached via either team's
+  // link resolves to one indexable URL.
+  const homeName = game.isHome ? team : game.home;
+  const url = `${SITE}/games/${slugifyTeam(homeName)}-${data.espnId}`;
   const image = `${SITE}/logo.png`;
   return {
     title,
