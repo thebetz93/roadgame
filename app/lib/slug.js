@@ -1,6 +1,7 @@
 // URL slug helpers for SEO route pages. Team names are unique across leagues in
 // our data, so a slug resolves to a single { team, league }.
 import { TEAMS_BY_LEAGUE } from "./leagues";
+import { VENUES } from "../venues";
 
 export function slugifyTeam(name) {
   return name
@@ -52,4 +53,24 @@ export function parseGameSlug(slug) {
   const resolved = resolveTeamSlug(m[1]);
   if (!resolved) return null;
   return { ...resolved, teamSlug: m[1], espnId: m[2], gameId: `espn-${m[2]}` };
+}
+
+// City slug -> { city, slug, teams: [team names based here] }, built from VENUES.
+const CITY_BY_SLUG = (() => {
+  const map = {};
+  for (const [team, v] of Object.entries(VENUES)) {
+    if (!v?.c) continue;
+    const slug = slugifyCity(v.c);
+    if (!map[slug]) map[slug] = { city: v.c, slug, teams: [] };
+    map[slug].teams.push(team);
+  }
+  return map;
+})();
+
+export function resolveCitySlug(slug) {
+  return CITY_BY_SLUG[slug] || null;
+}
+
+export function allCities() {
+  return Object.values(CITY_BY_SLUG);
 }
