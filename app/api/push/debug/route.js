@@ -21,7 +21,9 @@ export async function GET() {
     SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 
-  // Count profiles that have a stored push subscription.
+  // Count profiles that have a stored push subscription. Surface the FULL
+  // Postgres error (message/code/details/hint) — a missing column shows up as
+  // code 42703, which is the most likely cause of silent push failures.
   let subscriptions = null;
   let subError = null;
   try {
@@ -29,11 +31,16 @@ export async function GET() {
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .not("push_subscription", "is", null);
-    if (error) subError = String(error.message || error);
-    else subscriptions = count ?? 0;
+    if (error) {
+      subError = { message: error.message, code: error.code, details: error.details, hint: error.hint };
+    } else {
+      subscriptions = count ?? 0;
+    }
   } catch (e) {
-    subError = String(e);
+    subError = { thrown: e?.message || String(e) };
   }
+
+  const missingColumn = subError?.code === "42703";
 
   // Plain-English verdict, most-blocking issue first.
   let summary;
@@ -43,12 +50,14 @@ export async function GET() {
     summary = "BLOCKED: the server can't SEND pushes — VAPID_PRIVATE_KEY and/or VAPID_SUBJECT are missing in Vercel.";
   } else if (!env.CRON_SECRET) {
     summary = "BLOCKED: CRON_SECRET is missing, so the daily cron route rejects itself (401) and never sends. Add CRON_SECRET in Vercel and redeploy.";
+  } else if (missingColumn) {
+    summary = "ROOT CAUSE: the profiles table has no 'push_subscription' column, so subscriptions can never be saved and the cron has nothing to send. Fix: run  ALTER TABLE profiles ADD COLUMN IF NOT EXISTS push_subscription jsonb;  in Supabase, then re-enable notifications.";
+  } else if (subError) {
+    summary = "Env is set, but the subscription query errored — see subscriptionsError for the Postgres message/code.";
   } else if (subscriptions === 0) {
-    summary = "Config looks complete, but ZERO users have subscribed yet — enable notifications from an installed PWA, then re-check this count.";
-  } else if (subscriptions > 0) {
-    summary = `Config looks complete and ${subscriptions} subscription(s) are stored. If pushes still aren't arriving, the daily cron send is the place to look next.`;
+    summary = "Config + schema look complete, but ZERO users have subscribed yet — enable notifications from an installed PWA, then re-check this count.";
   } else {
-    summary = "Env looks set; couldn't read the subscription count (see subscriptionsError).";
+    summary = `Config + schema look complete and ${subscriptions} subscription(s) are stored. If pushes still aren't arriving, the daily cron send is the place to look next.`;
   }
 
   return Response.json({
