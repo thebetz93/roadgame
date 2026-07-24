@@ -233,6 +233,23 @@ export default function RoadGame() {
     const hasMagicToken = typeof window !== 'undefined' && (window.location.hash.includes('access_token') || window.location.search.includes('code='));
     const magicTimeout = hasMagicToken ? setTimeout(() => setLoading(false), 8000) : null;
 
+    // Surface OAuth / magic-link errors that Supabase appends to the return
+    // URL (in the hash or the query). Without this, a failed Google sign-in
+    // bounces back and is silently ignored — the user just sees they're still
+    // logged out, with no clue why.
+    try {
+      const hp = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+      const qp = new URLSearchParams(window.location.search || '');
+      const desc = hp.get('error_description') || qp.get('error_description');
+      const code = hp.get('error') || qp.get('error');
+      if (desc || code) {
+        setAuthError(decodeURIComponent(desc || code).replace(/\+/g, ' '));
+        setAuthOpen(true);
+        setLoading(false);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch {}
+
     try {
       const saved = localStorage.getItem('roadgame:guestLoc');
       if (saved) setGuestLoc(JSON.parse(saved));
